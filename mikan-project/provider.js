@@ -1,90 +1,5 @@
-// ========== 内置全部类型定义 ==========
-type AnimeProviderSmartSearchFilter = "batch" | "episodeNumber" | "resolution" | "query" | "bestReleases";
-type AnimeProviderType = "main" | "special";
-
-interface AnimeProviderSettings {
-    canSmartSearch: boolean;
-    smartSearchFilters: AnimeProviderSmartSearchFilter[];
-    supportsAdult: boolean;
-    type: AnimeProviderType;
-}
-
-interface FuzzyDate {
-    year: number;
-    month?: number;
-    day?: number;
-}
-
-interface Media {
-    id: number;
-    idMal?: number;
-    status?: string;
-    format?: string;
-    englishTitle?: string;
-    romajiTitle?: string;
-    episodeCount?: number;
-    absoluteSeasonOffset?: number;
-    synonyms: string[];
-    isAdult: boolean;
-    startDate?: FuzzyDate;
-}
-
-interface AnimeSearchOptions {
-    media?: Media;
-    query: string;
-}
-
-interface AnimeSmartSearchOptions {
-    media: Media;
-    query: string;
-    batch: boolean;
-    episodeNumber: number;
-    resolution: string;
-    anidbAID: number;
-    anidbEID: number;
-    bestReleases: boolean;
-}
-
-interface AnimeTorrent {
-    name: string;
-    date: string;
-    size: number;
-    formattedSize: string;
-    seeders: number;
-    leechers: number;
-    downloadCount: number;
-    link: string;
-    downloadUrl?: string;
-    magnetLink?: string;
-    infoHash?: string;
-    resolution?: string;
-    isBatch?: boolean;
-    episodeNumber: number;
-    releaseGroup?: string;
-    isBestRelease: boolean;
-    confirmed: boolean;
-}
-
-type UserConfig = {
-    baseUrl?: string;
-};
-
-type RssItem = {
-    title: string;
-    pageLink: string;
-    torrentUrl: string;
-    size: string;
-    pubDate: string;
-};
-// =====================================
-
 class Provider {
-    private readonly baseUrl: string;
-    private readonly searchEndpoint: string;
-    private readonly latestEndpoint: string;
-    private readonly headers: Record<string, string>;
-
-    constructor(config: UserConfig) {
+    constructor(config) {
         this.baseUrl = config?.baseUrl || "https://mikanime.tv";
         this.searchEndpoint = "/RSS/Search?searchstr=";
         this.latestEndpoint = "/RSS/Classic";
@@ -95,7 +10,7 @@ class Provider {
         };
     }
 
-    getSettings(): AnimeProviderSettings {
+    getSettings() {
         return {
             canSmartSearch: true,
             smartSearchFilters: ["batch", "episodeNumber", "resolution", "query"],
@@ -104,23 +19,23 @@ class Provider {
         };
     }
 
-    async search(opts: AnimeSearchOptions): Promise<AnimeTorrent[]> {
+    async search(opts) {
         const query = encodeURIComponent(opts.query);
         const url = this.baseUrl + this.searchEndpoint + query;
         const items = await this.fetchRSS(url);
         return items.map(item => this.parseTorrent(item));
     }
 
-    async smartSearch(opts: AnimeSmartSearchOptions): Promise<AnimeTorrent[]> {
+    async smartSearch(opts) {
         const queries = this.buildSmartSearchQueries(opts);
         const promises = queries.map(q => this.searchByWord(q));
         const resultsArr = await Promise.all(promises);
 
-        let allTorrents: AnimeTorrent[] = [];
+        let allTorrents = [];
         resultsArr.forEach(arr => allTorrents = allTorrents.concat(arr));
 
-        const seen = new Set<string>();
-        const unique: AnimeTorrent[] = [];
+        const seen = new Set();
+        const unique = [];
         for (const t of allTorrents) {
             const key = t.downloadUrl || t.infoHash || t.name;
             if (!seen.has(key)) {
@@ -140,14 +55,14 @@ class Provider {
         return filtered;
     }
 
-    async getTorrentInfoHash(torrent: AnimeTorrent): Promise<string> {
+    async getTorrentInfoHash(torrent) {
         if (torrent.infoHash) return torrent.infoHash;
         const magnet = await this.getTorrentMagnetLink(torrent);
         const match = magnet.match(/magnet:\?xt=urn:btih:([a-zA-Z0-9]+)/);
         return match ? match[1].toLowerCase() : "";
     }
 
-    async getTorrentMagnetLink(torrent: AnimeTorrent): Promise<string> {
+    async getTorrentMagnetLink(torrent) {
         if (torrent.magnetLink) return torrent.magnetLink;
         if (!torrent.downloadUrl) return "";
         try {
@@ -160,25 +75,25 @@ class Provider {
         }
     }
 
-    async getLatest(): Promise<AnimeTorrent[]> {
+    async getLatest() {
         const url = this.baseUrl + this.latestEndpoint;
         const items = await this.fetchRSS(url);
         return items.map(item => this.parseTorrent(item));
     }
 
-    private async searchByWord(word: string): Promise<AnimeTorrent[]> {
+    async searchByWord(word) {
         if (!word.trim()) return [];
         const url = this.baseUrl + this.searchEndpoint + encodeURIComponent(word);
         const items = await this.fetchRSS(url);
         return items.map(item => this.parseTorrent(item));
     }
 
-    private buildSmartSearchQueries(opts: AnimeSmartSearchOptions): string[] {
-        const queries: string[] = [];
+    buildSmartSearchQueries(opts) {
+        const queries = [];
         const media = opts.media;
         if (opts.query) queries.push(opts.query.trim());
 
-        const titles: string[] = [];
+        const titles = [];
         if (media.romajiTitle) titles.push(media.romajiTitle);
         if (media.englishTitle) titles.push(media.englishTitle);
         if (media.synonyms?.length) titles.push(...media.synonyms);
@@ -189,8 +104,8 @@ class Provider {
             if (opts.batch) queries.push(clean + " 合集");
         });
 
-        const seen = new Set<string>();
-        const unique: string[] = [];
+        const seen = new Set();
+        const unique = [];
         for (const q of queries) {
             const trimQ = q.trim();
             if (!seen.has(trimQ)) {
@@ -201,19 +116,19 @@ class Provider {
         return unique.slice(0, 5);
     }
 
-    private sanitizeTitle(text: string): string {
+    sanitizeTitle(text) {
         if (!text) return "";
         return text.replace(/[-_.!@#$%^&*()]/g, " ")
             .replace(/\s+/g, " ")
             .trim();
     }
 
-    private isBatchTorrent(torrent: AnimeTorrent): boolean {
+    isBatchTorrent(torrent) {
         const name = torrent.name;
         return /合集|全集|Batch|Complete|Season|\d+[-~]\d+/.test(name);
     }
 
-    private matchEpisodeNumber(title: string, targetEp: number): boolean {
+    matchEpisodeNumber(title, targetEp) {
         const padded = targetEp < 10 ? "0" + targetEp : String(targetEp);
         const regs = [
             new RegExp(`E${padded}\\b`),
@@ -224,7 +139,7 @@ class Provider {
         return regs.some(r => r.test(title));
     }
 
-    private async fetchRSS(url: string): RssItem[] {
+    async fetchRSS(url) {
         try {
             const res = await fetch(url, { headers: this.headers });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -236,10 +151,10 @@ class Provider {
         }
     }
 
-    private parseRSSItems(xml: string): RssItem[] {
-        const items: RssItem[] = [];
+    parseRSSItems(xml) {
+        const items = [];
         const itemReg = /<item>([\s\S]*?)<\/item>/gi;
-        let match: RegExpExecArray | null;
+        let match;
         while ((match = itemReg.exec(xml)) !== null) {
             const chunk = match[1];
             const title = this.getXmlText(chunk, "title");
@@ -258,17 +173,17 @@ class Provider {
         return items;
     }
 
-    private getXmlText(xmlStr: string, tag: string): string {
+    getXmlText(xmlStr, tag) {
         const reg = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i");
         const m = xmlStr.match(reg);
         return m ? this.stripCData(m[1]).trim() : "";
     }
 
-    private stripCData(str: string): string {
+    stripCData(str) {
         return str.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
     }
 
-    private parseTorrent(item: RssItem): AnimeTorrent {
+    parseTorrent(item) {
         const name = item.title;
         let resolution = "";
         if (/1080/.test(name)) resolution = "1080";
@@ -299,7 +214,7 @@ class Provider {
             magnetLink: "",
             infoHash: "",
             resolution,
-            isBatch: this.isBatchTorrent({ name } as AnimeTorrent),
+            isBatch: this.isBatchTorrent({ name }),
             episodeNumber: epNum,
             releaseGroup,
             isBestRelease: false,
@@ -307,7 +222,7 @@ class Provider {
         };
     }
 
-    private extractMagnet(rawTorrent: string): string {
+    extractMagnet(rawTorrent) {
         const magnetReg = /magnet:\?xt=urn:btih:[0-9a-zA-Z]+/;
         const m = rawTorrent.match(magnetReg);
         return m ? m[0] : "";

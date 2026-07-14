@@ -147,8 +147,10 @@ class Provider {
       const src = m[1];
       if (!src || seen[src]) continue;
 
+      // ====================== 完全照搬你原来的过滤规则 ======================
       if (!src.includes('/scomic/') && !src.includes('bzcdn.net')) continue;
       if (src.includes('logo') || src.includes('avatar') || src.includes('icon')) continue;
+      // ======================================================================
 
       seen[src] = true;
 

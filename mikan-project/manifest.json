@@ -8,8 +8,8 @@
   "language": "typescript",
   "lang": "zh",
   "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Cover.png",
-  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/provider.js",
-  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/manifest.json",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/mikan-project/provider.ts",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/mikan-project/manifest.json",
   "userConfig": {
     "requiresConfig": false,
     "version": 1,

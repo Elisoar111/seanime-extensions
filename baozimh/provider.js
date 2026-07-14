@@ -1,46 +1,36 @@
 class Provider {
+    private baseUrl: string;
     constructor() {
-        this.baseUrl = ($config && $config.baseUrl ? $config.baseUrl : 'https://cn.bzmanga.com').replace(/\/$/, '');
+        this.baseUrl = '{{baseUrl}}' || 'https://cn.bzmanga.com';
+        if (this.baseUrl.endsWith('/')) this.baseUrl = this.baseUrl.slice(0, -1);
     }
-    getSettings() {
+    getSettings(): Settings {
         return { supportsMultiScanlator: false, supportsMultiLanguage: false };
     }
-    async fetchHtml(url, retries = 2) {
-        for (let i = 0; i <= retries; i++) {
-            try {
-                const resp = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Referer': this.baseUrl + '/',
-                        'Accept': 'text/html',
-                        'Accept-Language': 'zh-CN,zh'
-                    }
-                });
-                if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                return await resp.text();
-            } catch (e) {
-                if (i === retries) {
-                    console.error('baozimh: request failed after ' + (retries + 1) + ' attempts', url);
-                    throw new Error('请求失败：' + e.message);
-                }
-                await new Promise(resolve => setTimeout(resolve, 1000));
+    private async fetchHtml(url: string): Promise<string> {
+        const resp = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': this.baseUrl + '/',
+                'Accept': 'text/html',
+                'Accept-Language': 'zh-CN,zh'
             }
+        });
+        if (!resp.ok) {
+            console.error('baozimh: request failed', { status: resp.status, url });
+            throw new Error(`request failed: status ${resp.status}`);
         }
-        throw new Error('不可达');
+        return await resp.text();
     }
-    decodeHtml(s) {
+    private decodeHtml(s: string): string {
         if (!s) return '';
-        const txt = document.createElement('textarea');
-        txt.innerHTML = s;
-        return txt.value.trim();
+        return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').trim();
     }
-    async search(opts) {
-        const ret = [];
-        const seen = {};
-        const query = encodeURIComponent(opts.query.trim());
-        if (!query) return [];
-        const url = this.baseUrl + '/search?q=' + query;
-        console.debug('baozimh: search', { query: opts.query, url: url });
+    async search(opts: QueryOptions): Promise<SearchResult[]> {
+        const ret: SearchResult[] = [];
+        const seen: Record<string, boolean> = {};
+        const url = `${this.baseUrl}/search?q=${encodeURIComponent(opts.query)}`;
+        console.debug('baozimh: search', { query: opts.query });
         const html = await this.fetchHtml(url);
         const re = /href="\/comic\/([^"]+)"/g;
         let m;
@@ -69,10 +59,11 @@ class Provider {
         console.debug('baozimh: found', ret.length);
         return ret.slice(0, 30);
     }
-    async findChapters(id) {
-        const ret = [];
-        const seen = {};
-        const html = await this.fetchHtml(this.baseUrl + '/comic/' + id);
+    async findChapters(id: string): Promise<ChapterDetails[]> {
+        const ret: ChapterDetails[] = [];
+        const seen: Record<string, boolean> = {};
+        console.debug('baozimh: findChapters', { mangaId: id });
+        const html = await this.fetchHtml(`${this.baseUrl}/comic/${id}`);
         const re = /chapter_slot=(\d+)"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/g;
         let m;
         let idx = 0;
@@ -82,8 +73,8 @@ class Provider {
             if (!slot || !title || seen[slot]) continue;
             seen[slot] = true;
             ret.push({
-                id: id + '::' + slot,
-                url: this.baseUrl + '/comic/chapter/' + id + '/0_' + slot + '.html',
+                id: `${id}::${slot}`,
+                url: `${this.baseUrl}/comic/chapter/${id}/0_${slot}.html`,
                 title: title,
                 chapter: String(idx + 1),
                 index: idx,
@@ -94,13 +85,14 @@ class Provider {
         console.debug('baozimh: chapters found', ret.length);
         return ret;
     }
-    async findChapterPages(chapterId) {
-        const ret = [];
-        const seen = {};
+    async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
+        const ret: ChapterPage[] = [];
+        const seen: Record<string, boolean> = {};
         const parts = chapterId.split('::');
         const mangaId = parts[0];
         const slot = parts[1];
-        const html = await this.fetchHtml(this.baseUrl + '/comic/chapter/' + mangaId + '/0_' + slot + '.html');
+        console.debug('baozimh: findChapterPages', { chapterId });
+        const html = await this.fetchHtml(`${this.baseUrl}/comic/chapter/${mangaId}/0_${slot}.html`);
         const re = /<(?:amp-img|img)[^>]+src="([^"]+)"/g;
         let m;
         let idx = 0;

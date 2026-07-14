@@ -1,0 +1,25 @@
+{
+  "id": "baozimh-manga-provider",
+  "name": "包子漫画",
+  "description": "Baozimanhua is a manhua provider for Seanime",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "manga-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/manifest.json",
+  "userConfig": {
+    "requiresConfig": false,
+    "version": 1,
+    "fields": [
+      {
+        "name": "baseUrl",
+        "label": "站点地址",
+        "type": "text",
+        "default": "https://cn.bzmanga.com",
+        "description": "失效时可更换镜像"
+      }
+    ]
+  }
+}

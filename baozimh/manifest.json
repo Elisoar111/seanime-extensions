@@ -2,7 +2,7 @@
   "id": "baozimh-manga-provider",
   "name": "包子漫画",
   "description": "Baozimanhua is a manhua provider for Seanime",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Elisoar",
   "type": "manga-provider",
   "language": "javascript",

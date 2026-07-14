@@ -2,7 +2,7 @@
   "id": "mikan-project",
   "name": "Mikan Project",
   "description": "蜜柑计划动漫种子磁力源，支持智能追番、关键词搜索、最新番资源",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "javascript",

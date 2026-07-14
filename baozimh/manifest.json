@@ -7,6 +7,7 @@
   "type": "manga-provider",
   "language": "javascript",
   "lang": "zh",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/Cover.png",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/provider.js",
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/manifest.json",
   "userConfig": {

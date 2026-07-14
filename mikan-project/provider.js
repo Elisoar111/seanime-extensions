@@ -13,7 +13,7 @@ class Provider {
     getSettings() {
         return {
             canSmartSearch: true,
-            smartSearchFilters: ["batch", "episodeNumber", "resolution", "query"],
+            smartSearchFilters: ["batch", "episodeNumber", "query"],
             supportsAdult: false,
             type: "main"
         };
@@ -58,7 +58,7 @@ class Provider {
     async getTorrentInfoHash(torrent) {
         if (torrent.infoHash) return torrent.infoHash;
         const magnet = await this.getTorrentMagnetLink(torrent);
-        const match = magnet.match(/magnet:\?xt=urn:btih:([a-zA-Z0-9]+)/);
+        const match = magnet.match(/magnet:\?xt=urn:([a-zA-Z0-9]+)/);
         return match ? match[1].toLowerCase() : "";
     }
 

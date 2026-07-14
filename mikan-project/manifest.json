@@ -7,7 +7,7 @@
   "type": "anime-torrent-provider",
   "language": "javascript",
   "lang": "zh",
-  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Cover.png",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/mikan-project/Cover.png",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/mikan-project/provider.js",
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/mikan-project/manifest.json",
   "userConfig": {

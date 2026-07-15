@@ -2,7 +2,7 @@
   "id": "mikan-project",
   "name": "Mikan Project",
   "description": "Mikan Project provides accurate, real-time Chinese subtitles for torrent-streamed Japanese animations.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "javascript",

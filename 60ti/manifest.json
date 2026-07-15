@@ -1,0 +1,12 @@
+{
+  "id": "sixty-manga-provider",
+  "name": "60ti Manga",
+  "description": "60ti is a Chinese manga provider for Seanime.",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "manga-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "payloadURI": "https://raw.githubusercontent.com/your-repo/60ti/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/your-repo/60ti/manifest.json"
+}

@@ -7,8 +7,8 @@
   "type": "manga-provider",
   "language": "javascript",
   "lang": "zh",
-  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/main/60ti/provider.js",
-  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/main/60ti/manifest.json",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/manifest.json",
   "userConfig": {
     "requiresConfig": false,
     "version": 1,

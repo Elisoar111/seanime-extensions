@@ -1,7 +1,7 @@
 {
   "id": "Anime-Garden",
   "name": "Anime Garden",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "typescript",

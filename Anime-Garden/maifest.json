@@ -1,11 +1,11 @@
 {
   "id": "animegarden-torrent-provider",
   "name": "AnimeGarden Torrent Provider",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "typescript",
-  "lang": "multi",
+  "lang": "zh",
   "description": "",
   "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Anime-Garden/Cover.png",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Anime-Garden/provider.ts",

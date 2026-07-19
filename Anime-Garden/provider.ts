@@ -13,7 +13,7 @@ class Provider {
   }
 
   async search(opts: AnimeSearchOptions): Promise<AnimeTorrent[]> {
-    const data = await this.fetchResources({ search: opts.query, type: "动画" })
+    const data = await this.fetchResources({ search: opts.query, type: "动画", tracker: "true" })
     return (data.resources || []).map((r: any) => this.toAnimeTorrent(r))
   }
 
@@ -101,15 +101,24 @@ class Provider {
   }
 
   async getTorrentInfoHash(torrent: AnimeTorrent): Promise<string> {
-    return torrent.infoHash || ""
+    if (torrent.infoHash) return torrent.infoHash
+    if (torrent.magnetLink) {
+      const m = torrent.magnetLink.match(/btih:([A-Fa-f0-9]+)/)
+      if (m) return m[1]
+    }
+    return ""
   }
 
   async getTorrentMagnetLink(torrent: AnimeTorrent): Promise<string> {
-    return torrent.magnetLink || ""
+    if (torrent.magnetLink) return torrent.magnetLink
+    if (torrent.infoHash) {
+      return `magnet:?xt=urn:btih:${torrent.infoHash}`
+    }
+    return ""
   }
 
   async getLatest(): Promise<AnimeTorrent[]> {
-    const data = await this.fetchResources({}, 30)
+    const data = await this.fetchResources({ tracker: "true" }, 30)
     return (data.resources || [])
       .filter((r: any) => r.type === "动画")
       .slice(0, 50)
@@ -180,7 +189,7 @@ class Provider {
     try {
       const params: Record<string, string | number> = {
         type: "动画",
-        metadata: "true",
+        tracker: "true",
       }
 
       params.search = query
@@ -313,10 +322,17 @@ class Provider {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   private toAnimeTorrent(r: any): AnimeTorrent {
-    let infoHash = ""
-    if (r.magnet) {
-      const m = r.magnet.match(/btih:([A-Fa-f0-9]+)/i)
-      if (m) infoHash = m[1].toUpperCase()
+    // Build magnet link with trackers
+    const trackerStr = typeof r.tracker === "string" ? r.tracker : ""
+    const magnetLink = trackerStr
+      ? r.magnet + trackerStr
+      : r.magnet
+
+    // Extract info hash from magnet link
+    let infoHash: string | undefined
+    if (magnetLink) {
+      const m = magnetLink.match(/btih:([A-Fa-f0-9]+)/)
+      if (m) infoHash = m[1]
     }
 
     // API stores size in KB, convert to bytes
@@ -331,8 +347,8 @@ class Provider {
       leechers: 0,
       downloadCount: 0,
       link: r.href,
-      downloadUrl: "",
-      magnetLink: r.magnet,
+      downloadUrl: magnetLink,
+      magnetLink,
       infoHash,
       resolution: "",
       isBatch: false,

@@ -1,7 +1,7 @@
 /// <reference path="./anime-torrent-provider.d.ts" />
 
 class Provider {
-  private api = "{{baseUrl}}"
+  private api = "https://api.animes.garden"
 
   getSettings(): AnimeProviderSettings {
     return {

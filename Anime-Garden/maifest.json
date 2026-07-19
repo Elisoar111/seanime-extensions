@@ -1,0 +1,27 @@
+{
+  "id": "animegarden-torrent-provider",
+  "name": "AnimeGarden Torrent Provider",
+  "version": "1.1.0",
+  "author": "Elisoar",
+  "type": "anime-torrent-provider",
+  "language": "typescript",
+  "lang": "multi",
+  "description": "",
+  "icon": "https://raw.githubusercontent.com/YOUR_USERNAME/animegarden-seanime/main/icon.png",
+  "payloadURI": "https://raw.githubusercontent.com/YOUR_USERNAME/animegarden-seanime/main/provider.ts",
+  "manifestURI": "https://raw.githubusercontent.com/YOUR_USERNAME/animegarden-seanime/main/manifest.json",
+  "notes": "依赖 AnimeGarden 公开 API (https://api.animes.garden)。如遇访问问题可配置镜像地址。",
+  "userConfig": {
+    "requiresConfig": false,
+    "version": 1,
+    "fields": [
+      {
+        "name": "baseUrl",
+        "label": "API 地址",
+        "type": "text",
+        "default": "https://api.animes.garden",
+        "description": "AnimeGarden API 地址，遇访问问题时替换为镜像地址"
+      }
+    ]
+  }
+}

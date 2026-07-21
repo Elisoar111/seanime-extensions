@@ -1,0 +1,25 @@
+{
+    "id": "bangumi-ui",
+    "name": "Bangumi UI",
+    "version": "2.0.0",
+    "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi-ui.json",
+    "language": "typescript",
+    "type": "plugin",
+    "description": "在番剧详情页展示 Bangumi 元数据卡片：评分对比、中文标题（可复制）、标签、简介、收藏统计、手动匹配。",
+    "author": "Elisoar111",
+    "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/icon.png",
+    "website": "https://github.com/Elisoar111/seanime-extensions/tree/main/Bangumi",
+    "readme": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/README.md",
+    "notes": "",
+    "lang": "multi",
+    "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi-ui.ts",
+    "plugin": {
+        "version": "1",
+        "permissions": {
+            "scopes": [],
+            "allow": {
+                "hosts": ["api.bgm.tv", "bgm.tv"]
+            }
+        }
+    }
+}

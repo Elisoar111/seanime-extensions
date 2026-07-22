@@ -1,15 +1,5 @@
 /// <reference path="./plugin.d.ts" />
 
-/**
- * Bangumi Metadata Plugin v3.0
- *
- * - Floating button on anime entry pages -> jumps to a full Bangumi info page (Webview screen)
- * - Multi-endpoint failover for users whose network blocks api.bgm.tv
- * - Rich info page: rating + rank + distribution chart, tags, infobox, summary,
- *   characters, episodes, related subjects, personal collection status (token),
- *   manual search / direct-ID binding, AniList score comparison
- * - Hook: injects Chinese titles into collection synonyms
- */
 function init(): void {
 
     $ui.register((ctx: UIContext): void => {

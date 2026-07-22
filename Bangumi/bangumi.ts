@@ -13,7 +13,7 @@
 function init(): void {
 
     $ui.register((ctx: UIContext): void => {
-        console.log("[bangumi-ui] 插件已加载 v3.2.5")
+        console.log("[bangumi-ui] 插件已加载 v1.1.3")
 
         // =================================================================
         //  Constants

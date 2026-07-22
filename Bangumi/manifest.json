@@ -11,6 +11,7 @@
   "website": "https://bgm.tv",
   "lang": "zh",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi.plugin.js",
+  "readme":"https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/README.md",
   "plugin": {
     "version": "1",
     "permissions": {

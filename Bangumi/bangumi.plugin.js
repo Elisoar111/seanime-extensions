@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v3.2.1");
+        console.log("[bangumi-ui] 插件已加载 v3.2.2");
         // =================================================================
         //  Constants
         // =================================================================
@@ -929,7 +929,12 @@ function init() {
                 ".statusrow{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;}\n" +
                 ".stbtn{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;transition:.15s;font-family:inherit;}\n" +
                 ".stbtn:hover{background:#334155;color:#e2e8f0;}\n" +
-                ".stbtn.active{background:rgba(240,145,153,.15);color:#f09199;border-color:rgba(240,145,153,.5);font-weight:600;}\n" +
+                ".stbtn.active{font-weight:600;}\n" +
+                ".stbtn.active.s1{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.5);}\n" +
+                ".stbtn.active.s2{background:rgba(52,211,153,.15);color:#34d399;border-color:rgba(52,211,153,.5);}\n" +
+                ".stbtn.active.s3{background:rgba(240,145,153,.15);color:#f09199;border-color:rgba(240,145,153,.5);}\n" +
+                ".stbtn.active.s4{background:rgba(251,191,36,.15);color:#fbbf24;border-color:rgba(251,191,36,.5);}\n" +
+                ".stbtn.active.s5{background:rgba(148,163,184,.15);color:#94a3b8;border-color:rgba(148,163,184,.5);}\n" +
                 ".progrow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;}\n" +
                 ".pbtn{width:26px;height:26px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px;cursor:pointer;line-height:1;font-family:inherit;}\n" +
                 ".pbtn:hover{background:#334155;}\n" +
@@ -948,12 +953,13 @@ function init() {
                 "  }\n" +
                 "  var vm=null;\n" +
                 "  var gotFirst=false;\n" +
-                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null;\n" +
+                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null,pendingStatus=null;\n" +
                 "  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n" +
                 "  function num(x){var n=Number(x);return isNaN(n)?0:n;}\n" +
                 "  window.webview.on('vm',function(v){\n" +
                 "    gotFirst=true;\n" +
                 "    pendingEp=null;\n" +
+                "    pendingStatus=null;\n" +
                 "    var si=document.getElementById('bgm-q');if(si)searchVal=si.value;\n" +
                 "    var ii=document.getElementById('bgm-id');if(ii)idVal=ii.value;\n" +
                 "    var y=window.scrollY||0;\n" +
@@ -1132,13 +1138,19 @@ function init() {
                 "    if(!vm.hasToken)return '<div class=\"muted small\" style=\"margin-top:10px;text-align:center;\">配置 Token 可管理我的收藏与进度</div>';\n" +
                 "    if(vm.tokenInvalid)return '<div class=\"warnbox\" style=\"margin-top:10px;\">Access Token 无效或已过期。请到 bgm.tv → 设置 → 开发者 重新创建令牌，并在 Seanime 插件设置中更新，然后点上方「刷新」。</div>';\n" +
                 "    var map=[[1,'想看'],[2,'看过'],[3,'在看'],[4,'搁置'],[5,'抛弃']];\n" +
-                "    var cur=(col&&col.status&&col.status.id)||0;\n" +
+                "    var cur=0;\n" +
+                "    if(col){\n" +
+                "      if(typeof col.type==='number')cur=col.type;\n" +
+                "      else if(col.type&&col.type.id)cur=col.type.id;\n" +
+                "      else if(col.status&&col.status.id)cur=col.status.id;\n" +
+                "    }\n" +
+                "    if(pendingStatus)cur=pendingStatus;\n" +
                 "    var h='<div class=\"collbox\">';\n" +
                 "    h+='<div class=\"colltitle\">我的收藏</div>';\n" +
                 "    h+='<div class=\"statusrow\">';\n" +
                 "    for(var i=0;i<map.length;i++){\n" +
                 "      var k=map[i][0];\n" +
-                "      h+='<button class=\"stbtn'+(cur===k?' active':'')+'\" data-action=\"set-status\" data-payload=\"'+k+'\">'+map[i][1]+'</button>';\n" +
+                "      h+='<button class=\"stbtn'+(cur===k?' active s'+k:'')+'\" data-action=\"set-status\" data-payload=\"'+k+'\">'+map[i][1]+'</button>';\n" +
                 "    }\n" +
                 "    h+='</div>';\n" +
                 "    if(cur){\n" +
@@ -1313,6 +1325,12 @@ function init() {
                 "        }\n" +
                 "        else if(a==='zoom-img'){\n" +
                 "          var fs=t.getAttribute('data-fullsrc')||t.src;if(fs)showZoom(fs);\n" +
+                "        }\n" +
+                "        else if(a==='set-status'){\n" +
+                "          pendingStatus=parseInt(p,10)||null;\n" +
+                "          pendingEp=null;\n" +
+                "          render();\n" +
+                "          window.webview.send('set-status',p);\n" +
                 "        }\n" +
                 "        else if(a==='prog-inc'||a==='prog-dec'){\n" +
                 "          var col0=vm&&vm.collection;\n" +

@@ -5,9 +5,9 @@
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/manifest.json",
   "language": "typescript",
   "type": "plugin",
-  "description": "在 Seanime 侧栏展示 Bangumi 番组计划元数据：评分、Rank、评分分布、标签、制作信息、角色、章节、关联条目、个人收藏状态。支持多端点故障转移与手动绑定。",
+  "description": "Display Bangumi metadata in the Seanime sidebar: ratings, rank, score distribution, tags, production info, characters, episodes, related entries, and personal collection status. Supports manual binding.",
   "author": "Elisoar",
-  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/Cover.jpg",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/icon.jpg",
   "website": "https://bgm.tv",
   "lang": "zh",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi.plugin.js",
@@ -29,7 +29,7 @@
             "*.bangumi.lol"
           ],
           "reasoning": "需要访问 Bangumi API 获取番剧评分与元数据；如配置镜像端点，请将对应域名加入此列表"
-        }
+        }m
       }
     }
   },

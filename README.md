@@ -1,3 +1,4 @@
+
 # seanime-extensions
 
 [![GitHub stars](https://img.shields.io/github/stars/Elisoar111/seanime-extensions)](https://github.com/Elisoar111/seanime-extensions/stargazers)
@@ -5,7 +6,7 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-56.7%25-yellow)](https://github.com/Elisoar111/seanime-extensions/search?l=javascript)
 [![TypeScript](https://img.shields.io/badge/TypeScript-43.3%25-blue)](https://github.com/Elisoar111/seanime-extensions/search?l=typescript)
 
-**Seanime 扩展集合** —— 为 [Seanime](https://seanime.app) 提供漫画源、动画种子源和功能插件。
+**Seanime Extensions Collection** —— 提供漫画源、动画种子源和功能插件，为 [Seanime](https://seanime.app) 扩展功能。
 
 ---
 
@@ -13,7 +14,7 @@
 
 | 扩展 | 类型 | 说明 |
 |------|------|------|
-| **[Bangumi 番组计划](./Bangumi)** | 插件 (Plugin) | 在 Seanime 侧栏查看 Bangumi 完整元数据，支持评分、角色、章节、关联条目及收藏管理 |
+| **[Bangumi 番组计划](./Bangumi)** | 插件 (Plugin) | 在 Seanime 侧栏查看 Bangumi 番组计划 的完整元数据，支持评分、角色、章节、关联条目及收藏管理 |
 | **[Anime Garden](./Anime-Garden)** | 动画种子源 (anime-torrent-provider) | 提供实时精准的中文字幕番剧种子 |
 | **[Mikan Project](./mikan-project)** | 动画种子源 (anime-torrent-provider) | 蜜柑计划 —— 实时精准的中文字幕番剧种子 |
 | **[60ti 漫画](./60ti)** | 漫画源 (manga-provider) | 60ti 中文漫画源 |
@@ -88,58 +89,58 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/man
 
 ### Anime Garden
 
-动画种子源扩展，通过 Anime Garden API 提供实时精准的中文字幕番剧种子。
+An **anime torrent provider** extension that fetches real-time, accurate Chinese subtitles anime torrents via the Anime Garden API.
 
-#### 配置说明：
+#### Configuration:
 
-- 可自定义 API 地址，默认为 `https://api.animes.garden`
-- 遇到访问问题时，可替换为镜像地址
+- Customize the API endpoint; the default is `https://api.animes.garden`
+- Replace with a mirror if the default endpoint becomes inaccessible
 
 ---
 
-### Mikan Project（蜜柑计划）
+### Mikan Project (蜜柑计划)
 
-动画种子源扩展，通过蜜柑计划提供实时精准的中文字幕番剧种子。
+An **anime torrent provider** extension that fetches real-time, accurate Chinese subtitles anime torrents via the **Mikan Project** API.
 
-#### 配置说明：
+#### Configuration:
 
-- 可自定义蜜柑站点地址，默认为 `https://mikanime.tv`
-- 站点无法访问时，可替换镜像域名
+- Customize the Mikan site address; default is `https://mikanime.tv`
+- Replace with a mirror if the site becomes inaccessible
 
 ---
 
 ### 60ti 漫画
 
-中文漫画源扩展。
+A **manga provider** extension for Chinese manga sources.
 
-#### 配置说明：
+#### Configuration:
 
-- 可自定义站点地址，默认为 `https://www.60ti.com`
-- 失效时可更换镜像
+- Customize the site address; default is `https://www.60ti.com`
+- Replace with a mirror if the site becomes inaccessible
+
+---
+
+### Baozi Manga (baozimh)
+
+A **manga provider** extension for Chinese manga sources.
+
+#### Configuration:
+
+- Customize the site address; default is `https://cn.bzmanga.com`
+- Replace with a mirror if the site becomes inaccessible
 
 ---
 
-### 包子漫画 (baozimh)
-
-中文漫画源扩展。
-
-#### 配置说明：
-
-- 可自定义站点地址，默认为 `https://cn.bzmanga.com`
-- 失效时可更换镜像
-
-
----
 
 ## 📄 许可证
 
-MIT 许可证
+MIT License
 
 ---
 
 ## 🙏 致谢
 
-- **Seanime** — 强大的动漫管理桌面应用
+- **Seanime** — 强大的动漫管理桌面应用（[https://seanime.app](https://seanime.app)）
 - **Bangumi 番组计划** — 动漫数据库
 - **Anime Garden** — 番剧种子聚合
 - **Mikan Project** — 蜜柑计划

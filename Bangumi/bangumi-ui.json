@@ -1,0 +1,78 @@
+{
+  "id": "bangumi-ui",
+  "name": "Bangumi 番组计划",
+  "version": "3.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi-ui.json",
+  "language": "typescript",
+  "type": "plugin",
+  "description": "在 Seanime 侧栏展示 Bangumi 番组计划元数据：评分、Rank、评分分布、标签、制作信息、角色、章节、关联条目、个人收藏状态。支持多端点故障转移与手动绑定。",
+  "author": "Elisoar",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/icon.svg",
+  "website": "https://bgm.tv",
+  "lang": "zh",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi.plugin.js",
+  "plugin": {
+    "version": "1",
+    "permissions": {
+      "scopes": [
+        "storage"
+      ],
+      "allow": {
+        "networkAccess": {
+          "allowedDomains": [
+            "api.bgm.tv",
+            "bgm.tv",
+            "*.bgm.tv",
+            "api.bangumi.lol",
+            "bangumi.lol",
+            "*.bangumi.lol"
+          ],
+          "reasoning": "需要访问 Bangumi API 获取番剧评分与元数据；如配置镜像端点，请将对应域名加入此列表"
+        }
+      }
+    }
+  },
+  "userConfig": {
+    "version": 1,
+    "requiresConfig": false,
+    "fields": [
+      {
+        "type": "text",
+        "name": "accessToken",
+        "label": "Bangumi Access Token（可选，bgm.tv → 设置 → 开发者 创建；填了显示我的收藏状态）",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "name": "apiEndpoints",
+        "label": "API 端点（英文逗号分隔多个；若无法访问可改用镜像 https://api.bangumi.lol）",
+        "description": "默认官方 API，国内用户可改为 https://api.bangumi.lol",
+        "default": "https://api.bgm.tv"
+      },
+      {
+        "type": "switch",
+        "name": "autoMatch",
+        "label": "自动匹配 Bangumi 条目",
+        "default": "true"
+      },
+      {
+        "type": "switch",
+        "name": "loadCharacters",
+        "label": "加载角色列表",
+        "default": "true"
+      },
+      {
+        "type": "switch",
+        "name": "loadEpisodes",
+        "label": "加载章节列表",
+        "default": "true"
+      },
+      {
+        "type": "switch",
+        "name": "loadRelations",
+        "label": "加载关联条目",
+        "default": "true"
+      }
+    ]
+  }
+}

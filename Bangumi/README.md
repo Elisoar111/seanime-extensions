@@ -28,7 +28,7 @@ View full [Bangumi](https://bgm.tv) metadata — ratings, characters, episodes, 
 复制以下链接，在 Seanime → Extensions → 右上角 + → **Install from URL** 粘贴 / Copy the manifest URL and paste in Seanime → Extensions → Install from URL:
 
 ```
-https://raw.githubusercontent.com/Elisoar111/seanime-extensions/master/Bangumi/manifest.json
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/manifest.json
 ```
 
 ### 方式二：手动安装 / Manual Install

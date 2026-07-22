@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v3.1.0");
+        console.log("[bangumi-ui] 插件已加载 v3.2.0");
         // =================================================================
         //  Constants
         // =================================================================
@@ -11,6 +11,7 @@ function init() {
         var MNS = "bangumi.match.";
         var TTL = 86400000 * 3;
         var DEFAULT_ENDPOINTS = "https://api.bgm.tv";
+        var MIRROR_ENDPOINT = "https://api.bangumi.lol";
         var emptyVM = {
             status: "idle", errorMsg: "", mediaId: 0, subjectId: 0,
             endpoint: "", bound: false, entry: null, subject: null,
@@ -68,6 +69,10 @@ function init() {
             }
             if (!out.length)
                 out.push(DEFAULT_ENDPOINTS);
+            // 默认配置（仅官方 API）时自动追加公共镜像兜底；用户自定义端点则尊重其配置
+            if (raw.replace(/\s+/g, "") === DEFAULT_ENDPOINTS && out.indexOf(MIRROR_ENDPOINT) === -1) {
+                out.push(MIRROR_ENDPOINT);
+            }
             // Sticky: try last known-good endpoint first
             if (lastGoodEndpoint && out.indexOf(lastGoodEndpoint) > 0) {
                 out.splice(out.indexOf(lastGoodEndpoint), 1);
@@ -93,21 +98,27 @@ function init() {
             var eps = endpoints();
             return tryGet(eps, 0, path);
         }
-        function tryGet(eps, i, path) {
+        function tryGet(eps, i, path, retries) {
             if (i >= eps.length)
                 return Promise.reject(new Error("所有 Bangumi 端点均无法连接"));
             var url = eps[i] + path;
+            var left = retries === undefined ? 2 : retries;
             return ctx.fetch(url, { headers: hdrs() }).then(function (r) {
                 // Token 无效时去掉 Authorization 重试一次
                 if (r && r.status === 401 && pref("accessToken", "")) {
                     console.log("[bangumi-ui] 401 (token 无效), 去掉 token 重试");
-                    return ctx.fetch(url, { headers: hdrsNoAuth() }).then(function (r2) { return handleGetResp(r2, eps, i, path); }, function () { return tryGet(eps, i + 1, path); });
+                    return ctx.fetch(url, { headers: hdrsNoAuth() }).then(function (r2) { return handleGetResp(r2, eps, i, path, left); }, function () { return tryGet(eps, i + 1, path); });
                 }
-                return handleGetResp(r, eps, i, path);
+                return handleGetResp(r, eps, i, path, left);
             }, function () { return tryGet(eps, i + 1, path); });
         }
-        // 5xx / 429 / 403 / 无响应 → 切换端点；2xx 与 404 视为正常响应
-        function handleGetResp(r, eps, i, path) {
+        // 429 限流 → 等待重试当前端点；5xx / 403 / 无响应 → 切换端点；2xx 与 404 视为正常响应
+        function handleGetResp(r, eps, i, path, retries) {
+            if (r && r.status === 429 && retries > 0) {
+                console.log("[bangumi-ui] 429 限流，2s 后重试 " + eps[i]);
+                $sleep(2000);
+                return tryGet(eps, i, path, retries - 1);
+            }
             if (!r || !r.status || r.status >= 500 || r.status === 429 || r.status === 403) {
                 return tryGet(eps, i + 1, path);
             }
@@ -124,10 +135,11 @@ function init() {
             });
             return trySearch(eps, 0, body);
         }
-        function trySearch(eps, i, body) {
+        function trySearch(eps, i, body, retries) {
             if (i >= eps.length)
                 return Promise.reject(new Error("所有 Bangumi 端点均无法连接"));
             var url = eps[i] + "/v0/search/subjects";
+            var left = retries === undefined ? 2 : retries;
             var h = hdrs();
             h["Content-Type"] = "application/json";
             return ctx.fetch(url, { method: "POST", headers: h, body: body }).then(function (r) {
@@ -136,14 +148,19 @@ function init() {
                     var h2 = hdrsNoAuth();
                     h2["Content-Type"] = "application/json";
                     return ctx.fetch(url, { method: "POST", headers: h2, body: body }).then(function (r2) {
-                        return handleSearchResp(r2, eps, i, body);
+                        return handleSearchResp(r2, eps, i, body, left);
                     }, function () { return trySearch(eps, i + 1, body); });
                 }
-                return handleSearchResp(r, eps, i, body);
+                return handleSearchResp(r, eps, i, body, left);
             }, function () { return trySearch(eps, i + 1, body); });
         }
-        // 非 2xx / 解析失败一律故障转移到下一个端点
-        function handleSearchResp(r, eps, i, body) {
+        // 429 限流 → 等待重试当前端点；其余非 2xx / 解析失败 → 切换端点
+        function handleSearchResp(r, eps, i, body, retries) {
+            if (r && r.status === 429 && retries > 0) {
+                console.log("[bangumi-ui] 429 限流，2s 后重试 " + eps[i]);
+                $sleep(2000);
+                return trySearch(eps, i, body, retries - 1);
+            }
             if (!r || !r.status || r.status < 200 || r.status >= 300) {
                 return trySearch(eps, i + 1, body);
             }
@@ -158,6 +175,32 @@ function init() {
             if (!d)
                 return trySearch(eps, i + 1, body);
             return Promise.resolve(d);
+        }
+        // POST / PATCH 写请求（收藏状态、进度），同样支持故障转移与 429 退避
+        function apiWrite(method, path, obj) {
+            var eps = endpoints();
+            var body = JSON.stringify(obj || {});
+            return tryWrite(eps, 0, method, path, body);
+        }
+        function tryWrite(eps, i, method, path, body, retries) {
+            if (i >= eps.length)
+                return Promise.reject(new Error("所有 Bangumi 端点均无法连接"));
+            var url = eps[i] + path;
+            var left = retries === undefined ? 2 : retries;
+            var h = hdrs();
+            h["Content-Type"] = "application/json";
+            return ctx.fetch(url, { method: method, headers: h, body: body }).then(function (r) {
+                if (r && r.status === 429 && left > 0) {
+                    console.log("[bangumi-ui] 429 限流，2s 后重试 " + eps[i]);
+                    $sleep(2000);
+                    return tryWrite(eps, i, method, path, body, left - 1);
+                }
+                if (!r || !r.status || r.status >= 500 || r.status === 429 || r.status === 403) {
+                    return tryWrite(eps, i + 1, method, path, body);
+                }
+                lastGoodEndpoint = eps[i];
+                return Promise.resolve(r);
+            }, function () { return tryWrite(eps, i + 1, method, path, body); });
         }
         // =================================================================
         //  Storage cache
@@ -708,6 +751,48 @@ function init() {
             ctx.toast.success("已清除该条目的缓存与绑定");
             loadForEntry(id, false);
         });
+        // ---- 收藏状态与观看进度管理（需要 access token）----
+        wv.channel.on("set-status", function (v) {
+            var sid = vm.get().subjectId;
+            var t = parseInt(String(v || ""), 10);
+            if (!sid || !t || t < 1 || t > 5)
+                return;
+            if (!pref("accessToken", "")) {
+                ctx.toast.error("请先在插件设置中配置 Bangumi Access Token");
+                return;
+            }
+            apiWrite("POST", "/v0/users/-/collections/" + sid, { type: t }).then(function (r) {
+                if (r && r.status && r.status >= 200 && r.status < 300) {
+                    ctx.toast.success("已更新收藏状态");
+                    loadCollection(sid, reqSeq);
+                }
+                else {
+                    ctx.toast.error("状态更新失败 (HTTP " + (r ? r.status : "无响应") + ")");
+                }
+            }, function () { return ctx.toast.error("状态更新失败：无法连接 Bangumi"); });
+        });
+        wv.channel.on("set-progress", function (v) {
+            var sid = vm.get().subjectId;
+            var n = parseInt(String(v || ""), 10);
+            if (!sid || isNaN(n) || n < 0)
+                return;
+            if (!pref("accessToken", "")) {
+                ctx.toast.error("请先在插件设置中配置 Bangumi Access Token");
+                return;
+            }
+            apiWrite("PATCH", "/v0/users/-/collections/" + sid, { ep_status: n }).then(function (r) {
+                if (r && r.status && r.status >= 200 && r.status < 300) {
+                    ctx.toast.success("进度已更新到第 " + n + " 话");
+                    loadCollection(sid, reqSeq);
+                }
+                else if (r && r.status === 404) {
+                    ctx.toast.error("请先设置收藏状态，再更新进度");
+                }
+                else {
+                    ctx.toast.error("进度更新失败 (HTTP " + (r ? r.status : "无响应") + ")");
+                }
+            }, function () { return ctx.toast.error("进度更新失败：无法连接 Bangumi"); });
+        });
         wv.channel.on("open-bgm", function (v) {
             var sid = parseInt(String(v || ""), 10) || vm.get().subjectId;
             if (!sid)
@@ -823,6 +908,16 @@ function init() {
                 ".warnbox{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 16px;margin-top:12px;font-size:13px;color:#fbbf24;}\n" +
                 ".zoombg{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadein .15s ease;}\n" +
                 ".zoombg img{max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.6);cursor:default;display:block;object-fit:contain;}\n" +
+                ".collbox{margin-top:14px;padding:12px;background:#0b0f16;border:1px solid #1e293b;border-radius:12px;}\n" +
+                ".colltitle{font-size:12px;color:#64748b;text-align:center;margin-bottom:8px;}\n" +
+                ".statusrow{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;}\n" +
+                ".stbtn{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;transition:.15s;font-family:inherit;}\n" +
+                ".stbtn:hover{background:#334155;color:#e2e8f0;}\n" +
+                ".stbtn.active{background:rgba(240,145,153,.15);color:#f09199;border-color:rgba(240,145,153,.5);font-weight:600;}\n" +
+                ".progrow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;}\n" +
+                ".pbtn{width:26px;height:26px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px;cursor:pointer;line-height:1;font-family:inherit;}\n" +
+                ".pbtn:hover{background:#334155;}\n" +
+                ".progtxt{font-size:12px;color:#cbd5e1;min-width:110px;text-align:center;}\n" +
                 "</style>\n" +
                 "</head>\n" +
                 "<body>\n" +
@@ -837,11 +932,12 @@ function init() {
                 "  }\n" +
                 "  var vm=null;\n" +
                 "  var gotFirst=false;\n" +
-                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars';\n" +
+                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null;\n" +
                 "  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n" +
                 "  function num(x){var n=Number(x);return isNaN(n)?0:n;}\n" +
                 "  window.webview.on('vm',function(v){\n" +
                 "    gotFirst=true;\n" +
+                "    pendingEp=null;\n" +
                 "    var si=document.getElementById('bgm-q');if(si)searchVal=si.value;\n" +
                 "    var ii=document.getElementById('bgm-id');if(ii)idVal=ii.value;\n" +
                 "    var y=window.scrollY||0;\n" +
@@ -1015,13 +1111,29 @@ function init() {
                 "    return '<div class=\"muted small\" style=\"margin-top:10px;text-align:center;\">'+esc(parts.join(' · '))+'</div>';\n" +
                 "  }\n" +
                 "  function renderCollection(){\n" +
+                "    var s=vm.subject||{};\n" +
                 "    var col=vm.collection;\n" +
-                "    if(!col)return vm.hasToken?'':'<div class=\"muted small\" style=\"margin-top:10px;text-align:center;\">配置 Token 可显示我的收藏状态</div>';\n" +
-                "    var map={wish:'想看',doing:'在看',collect:'看过',on_hold:'搁置',dropped:'抛弃'};\n" +
-                "    var st=(col.status&&col.status.name)||'';\n" +
-                "    var label=map[st]||st;\n" +
-                "    var h='<div style=\"margin-top:10px;text-align:center;\">'+chip('我: '+label,'pink');\n" +
-                "    if(col.rate)h+=' '+chip('我的评分 '+col.rate,'gold');\n" +
+                "    if(!vm.hasToken)return '<div class=\"muted small\" style=\"margin-top:10px;text-align:center;\">配置 Token 可管理我的收藏与进度</div>';\n" +
+                "    var map=[[1,'想看'],[2,'看过'],[3,'在看'],[4,'搁置'],[5,'抛弃']];\n" +
+                "    var cur=(col&&col.status&&col.status.id)||0;\n" +
+                "    var h='<div class=\"collbox\">';\n" +
+                "    h+='<div class=\"colltitle\">我的收藏</div>';\n" +
+                "    h+='<div class=\"statusrow\">';\n" +
+                "    for(var i=0;i<map.length;i++){\n" +
+                "      var k=map[i][0];\n" +
+                "      h+='<button class=\"stbtn'+(cur===k?' active':'')+'\" data-action=\"set-status\" data-payload=\"'+k+'\">'+map[i][1]+'</button>';\n" +
+                "    }\n" +
+                "    h+='</div>';\n" +
+                "    if(cur){\n" +
+                "      var ep=(pendingEp!==null)?pendingEp:((col&&col.ep_status)||0);\n" +
+                "      var total=(s.eps||s.eps_count||s.total_episodes)||0;\n" +
+                "      h+='<div class=\"progrow\">';\n" +
+                "      h+='<button class=\"pbtn\" data-action=\"prog-dec\" title=\"Decrease Progress\">−</button>';\n" +
+                "      h+='<span class=\"progtxt\">看到第 '+ep+' 话'+(total?' / 共 '+total+' 话':'')+'</span>';\n" +
+                "      h+='<button class=\"pbtn\" data-action=\"prog-inc\" title=\"Increase Progress\">+</button>';\n" +
+                "      h+='</div>';\n" +
+                "    }\n" +
+                "    if(col&&col.rate)h+='<div style=\"margin-top:8px;text-align:center;\">'+chip('我的评分 '+col.rate,'gold')+'</div>';\n" +
                 "    h+='</div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
@@ -1184,6 +1296,15 @@ function init() {
                 "        }\n" +
                 "        else if(a==='zoom-img'){\n" +
                 "          var fs=t.getAttribute('data-fullsrc')||t.src;if(fs)showZoom(fs);\n" +
+                "        }\n" +
+                "        else if(a==='prog-inc'||a==='prog-dec'){\n" +
+                "          var col0=vm&&vm.collection;\n" +
+                "          var base=(pendingEp!==null)?pendingEp:((col0&&col0.ep_status)||0);\n" +
+                "          var nv=base+(a==='prog-inc'?1:-1);\n" +
+                "          if(nv<0)nv=0;\n" +
+                "          pendingEp=nv;\n" +
+                "          render();\n" +
+                "          window.webview.send('set-progress',String(nv));\n" +
                 "        }\n" +
                 "        else{window.webview.send(a,p);}\n" +
                 "        ev.preventDefault();\n" +

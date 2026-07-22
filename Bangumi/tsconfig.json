@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "none",
+    "lib": ["ES6", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "outFile": "bangumi.plugin.js"
+  },
+  "files": ["bangumi.plugin.ts"]
+}

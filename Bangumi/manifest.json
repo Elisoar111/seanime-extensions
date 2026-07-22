@@ -1,7 +1,7 @@
 {
   "id": "bangumi-ui",
   "name": "Bangumi 番组计划",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/manifest.json",
   "language": "typescript",
   "type": "plugin",
@@ -39,7 +39,7 @@
       {
         "type": "text",
         "name": "accessToken",
-        "label": "Bangumi Access Token（可选，bgm.tv → 设置 → 开发者 创建；填了显示我的收藏状态）",
+        "label": "Bangumi Access Token（可选https://bangumi.lol/dev/app/create；填写管理我的收藏状态）",
         "default": ""
       },
       {

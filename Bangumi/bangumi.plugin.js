@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v3.2.2");
+        console.log("[bangumi-ui] 插件已加载 v1.1.2");
         // =================================================================
         //  Constants
         // =================================================================

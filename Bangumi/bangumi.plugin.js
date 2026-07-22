@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v3.2.0");
+        console.log("[bangumi-ui] 插件已加载 v3.2.1");
         // =================================================================
         //  Constants
         // =================================================================
@@ -16,7 +16,7 @@ function init() {
             status: "idle", errorMsg: "", mediaId: 0, subjectId: 0,
             endpoint: "", bound: false, entry: null, subject: null,
             chars: null, rels: null, eps: null, collection: null,
-            searchResults: [], searching: false, hasToken: false
+            searchResults: [], searching: false, hasToken: false, tokenInvalid: false
         };
         var mediaIdState = ctx.state(0);
         var vm = ctx.state(emptyVM);
@@ -85,7 +85,7 @@ function init() {
                 "User-Agent": "Seanime-Bangumi/3.0",
                 "Accept": "application/json"
             };
-            var t = pref("accessToken", "");
+            var t = pref("accessToken", "").replace(/^\s+|\s+$/g, "");
             if (t)
                 h["Authorization"] = "Bearer " + t;
             return h;
@@ -354,7 +354,7 @@ function init() {
                 status: "loading", errorMsg: "", mediaId: id, subjectId: 0,
                 bound: false, subject: null, chars: null, rels: null, eps: null,
                 collection: null, searchResults: [], searching: false,
-                hasToken: !!pref("accessToken", "")
+                hasToken: !!pref("accessToken", ""), tokenInvalid: false
             });
             if (force)
                 cDel(id);
@@ -610,6 +610,10 @@ function init() {
             var pUser = cachedUser
                 ? Promise.resolve(JSON.parse(String(cachedUser)))
                 : apiGet("/v0/me").then(function (r) {
+                    if (r && r.status === 401) {
+                        patchVm({ tokenInvalid: true });
+                        return null;
+                    }
                     var me = r ? r.json() : null;
                     if (me && me.username) {
                         try {
@@ -625,6 +629,10 @@ function init() {
                 apiGet("/v0/users/" + encodeURIComponent(me.username) + "/collections/" + sid).then(function (r) {
                     if (stale())
                         return;
+                    if (r && r.status === 401) {
+                        patchVm({ tokenInvalid: true });
+                        return;
+                    }
                     if (!r || (r.status && r.status === 404))
                         return;
                     var col = r ? r.json() : null;
@@ -766,6 +774,10 @@ function init() {
                     ctx.toast.success("已更新收藏状态");
                     loadCollection(sid, reqSeq);
                 }
+                else if (r && r.status === 401) {
+                    patchVm({ tokenInvalid: true });
+                    ctx.toast.error("Token 无效或已过期，请到 bgm.tv → 设置 → 开发者 重新创建");
+                }
                 else {
                     ctx.toast.error("状态更新失败 (HTTP " + (r ? r.status : "无响应") + ")");
                 }
@@ -784,6 +796,10 @@ function init() {
                 if (r && r.status && r.status >= 200 && r.status < 300) {
                     ctx.toast.success("进度已更新到第 " + n + " 话");
                     loadCollection(sid, reqSeq);
+                }
+                else if (r && r.status === 401) {
+                    patchVm({ tokenInvalid: true });
+                    ctx.toast.error("Token 无效或已过期，请到 bgm.tv → 设置 → 开发者 重新创建");
                 }
                 else if (r && r.status === 404) {
                     ctx.toast.error("请先设置收藏状态，再更新进度");
@@ -1114,6 +1130,7 @@ function init() {
                 "    var s=vm.subject||{};\n" +
                 "    var col=vm.collection;\n" +
                 "    if(!vm.hasToken)return '<div class=\"muted small\" style=\"margin-top:10px;text-align:center;\">配置 Token 可管理我的收藏与进度</div>';\n" +
+                "    if(vm.tokenInvalid)return '<div class=\"warnbox\" style=\"margin-top:10px;\">Access Token 无效或已过期。请到 bgm.tv → 设置 → 开发者 重新创建令牌，并在 Seanime 插件设置中更新，然后点上方「刷新」。</div>';\n" +
                 "    var map=[[1,'想看'],[2,'看过'],[3,'在看'],[4,'搁置'],[5,'抛弃']];\n" +
                 "    var cur=(col&&col.status&&col.status.id)||0;\n" +
                 "    var h='<div class=\"collbox\">';\n" +

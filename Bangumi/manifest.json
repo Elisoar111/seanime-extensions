@@ -29,7 +29,7 @@
             "*.bangumi.lol"
           ],
           "reasoning": "需要访问 Bangumi API 获取番剧评分与元数据；如配置镜像端点，请将对应域名加入此列表"
-        }m
+        }
       }
     }
   },

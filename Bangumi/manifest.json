@@ -7,7 +7,7 @@
   "type": "plugin",
   "description": "Display Bangumi metadata in the Seanime sidebar: ratings, rank, score distribution, tags, production info, characters, episodes, related entries, and personal collection status. Supports manual binding.",
   "author": "Elisoar",
-  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/icon.jpg",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/icon.png",
   "website": "https://bgm.tv",
   "lang": "zh",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/bangumi.plugin.js",

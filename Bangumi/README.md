@@ -22,7 +22,7 @@
 复制 manifest 链接，在 Seanime → Extensions → 右上角 + → **Install from URL** 粘贴：
 
 ```
-https://raw.githubusercontent.com/Elisoar111/seanime-extensions/master/Bangumi/bangumi-ui.json
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/master/Bangumi/manifest.json
 ```
 
 ### 方式二：手动安装

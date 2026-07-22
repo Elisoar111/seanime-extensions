@@ -1,18 +1,8 @@
 "use strict";
 /// <reference path="./plugin.d.ts" />
-/**
- * Bangumi Metadata Plugin v3.0
- *
- * - Floating button on anime entry pages -> jumps to a full Bangumi info page (Webview screen)
- * - Multi-endpoint failover for users whose network blocks api.bgm.tv
- * - Rich info page: rating + rank + distribution chart, tags, infobox, summary,
- *   characters, episodes, related subjects, personal collection status (token),
- *   manual search / direct-ID binding, AniList score comparison
- * - Hook: injects Chinese titles into collection synonyms
- */
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v3.0.0");
+        console.log("[bangumi-ui] 插件已加载 v3.1.0");
         // =================================================================
         //  Constants
         // =================================================================
@@ -111,20 +101,18 @@ function init() {
                 // Token 无效时去掉 Authorization 重试一次
                 if (r && r.status === 401 && pref("accessToken", "")) {
                     console.log("[bangumi-ui] 401 (token 无效), 去掉 token 重试");
-                    return ctx.fetch(url, { headers: hdrsNoAuth() }).then(function (r2) {
-                        if (r2 && r2.status && (r2.status >= 500 || r2.status === 429)) {
-                            return tryGet(eps, i + 1, path);
-                        }
-                        lastGoodEndpoint = eps[i];
-                        return r2;
-                    }, function () { return tryGet(eps, i + 1, path); });
+                    return ctx.fetch(url, { headers: hdrsNoAuth() }).then(function (r2) { return handleGetResp(r2, eps, i, path); }, function () { return tryGet(eps, i + 1, path); });
                 }
-                if (r && r.status && (r.status >= 500 || r.status === 429)) {
-                    return tryGet(eps, i + 1, path);
-                }
-                lastGoodEndpoint = eps[i];
-                return r;
+                return handleGetResp(r, eps, i, path);
             }, function () { return tryGet(eps, i + 1, path); });
+        }
+        // 5xx / 429 / 403 / 无响应 → 切换端点；2xx 与 404 视为正常响应
+        function handleGetResp(r, eps, i, path) {
+            if (!r || !r.status || r.status >= 500 || r.status === 429 || r.status === 403) {
+                return tryGet(eps, i + 1, path);
+            }
+            lastGoodEndpoint = eps[i];
+            return Promise.resolve(r);
         }
         // POST search with failover
         function apiSearch(kw, limit) {
@@ -148,21 +136,28 @@ function init() {
                     var h2 = hdrsNoAuth();
                     h2["Content-Type"] = "application/json";
                     return ctx.fetch(url, { method: "POST", headers: h2, body: body }).then(function (r2) {
-                        if (r2 && r2.status && (r2.status >= 500 || r2.status === 429)) {
-                            return trySearch(eps, i + 1, body);
-                        }
-                        lastGoodEndpoint = eps[i];
-                        var d2 = r2 ? r2.json() : null;
-                        return d2 || { data: [] };
+                        return handleSearchResp(r2, eps, i, body);
                     }, function () { return trySearch(eps, i + 1, body); });
                 }
-                if (r && r.status && (r.status >= 500 || r.status === 429)) {
-                    return trySearch(eps, i + 1, body);
-                }
-                lastGoodEndpoint = eps[i];
-                var d = r ? r.json() : null;
-                return d || { data: [] };
+                return handleSearchResp(r, eps, i, body);
             }, function () { return trySearch(eps, i + 1, body); });
+        }
+        // 非 2xx / 解析失败一律故障转移到下一个端点
+        function handleSearchResp(r, eps, i, body) {
+            if (!r || !r.status || r.status < 200 || r.status >= 300) {
+                return trySearch(eps, i + 1, body);
+            }
+            lastGoodEndpoint = eps[i];
+            var d = null;
+            try {
+                d = r.json();
+            }
+            catch (_) {
+                d = null;
+            }
+            if (!d)
+                return trySearch(eps, i + 1, body);
+            return Promise.resolve(d);
         }
         // =================================================================
         //  Storage cache
@@ -356,7 +351,7 @@ function init() {
             });
         }
         function getEntryMeta(id) {
-            var fallback = { titles: [], cover: "", score: 0, year: 0 };
+            var fallback = { titles: [], cover: "", banner: "", score: 0, year: 0 };
             var p;
             try {
                 var r = ctx.anime.getAnimeEntry(id);
@@ -377,18 +372,20 @@ function init() {
                 else if (en.media.seasonYear)
                     year = en.media.seasonYear;
                 var ci = en.media.coverImage || {};
+                // 日语标题优先：Bangumi 主名称字段就是日文原名
                 var raw = [];
-                if (ti.userPreferred)
-                    raw.push(ti.userPreferred);
+                if (ti.native)
+                    raw.push(ti.native);
                 if (ti.romaji && raw.indexOf(ti.romaji) === -1)
                     raw.push(ti.romaji);
+                if (ti.userPreferred && raw.indexOf(ti.userPreferred) === -1)
+                    raw.push(ti.userPreferred);
                 if (ti.english && raw.indexOf(ti.english) === -1)
                     raw.push(ti.english);
-                if (ti.native && raw.indexOf(ti.native) === -1)
-                    raw.push(ti.native);
                 return {
                     titles: raw,
                     cover: ci.extraLarge || ci.large || ci.medium || "",
+                    banner: en.media.bannerImage || "",
                     score: en.media.averageScore || 0,
                     year: year
                 };
@@ -429,6 +426,7 @@ function init() {
             var year = meta.year || 0;
             var globalBest = null;
             var globalScore = 0;
+            var netFail = 0;
             function tryCandidate(idx) {
                 if (stale())
                     return;
@@ -437,6 +435,10 @@ function init() {
                         if (globalScore >= 0.92)
                             mSet(id, globalBest.id);
                         fetchSubject(id, globalBest.id, seq, globalScore >= 0.92);
+                        return;
+                    }
+                    if (netFail >= cands.length) {
+                        patchVm({ status: "error", errorMsg: "无法连接 Bangumi（可在插件设置中配置镜像端点 https://api.bangumi.lol）" });
                         return;
                     }
                     patchVm({ status: "not-found", errorMsg: "未找到 Bangumi 条目，请手动搜索" });
@@ -469,6 +471,7 @@ function init() {
                 }, function () {
                     if (stale())
                         return;
+                    netFail++;
                     tryCandidate(idx + 1);
                 });
             }
@@ -496,7 +499,13 @@ function init() {
                     patchVm({ status: "error", errorMsg: "获取条目详情失败：响应为空" });
                     return;
                 }
-                var d = r ? r.json() : null;
+                var d = null;
+                try {
+                    d = r.json();
+                }
+                catch (_) {
+                    d = null;
+                }
                 if (!d || !d.id) {
                     patchVm({ status: "error", errorMsg: "获取条目详情失败" });
                     return;
@@ -725,59 +734,78 @@ function init() {
                 "body{background:transparent;color:#e2e8f0;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;margin:0;padding:24px;font-size:14px;line-height:1.6;}\n" +
                 "a{color:#8b5cf6;text-decoration:none;}\n" +
                 ".wrap{max-width:1080px;margin:0 auto;}\n" +
+                ".fade{animation:fadein .25s ease;}\n" +
+                "@keyframes fadein{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}\n" +
                 ".topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;}\n" +
-                ".brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;}\n" +
-                ".brand .dot{width:10px;height:10px;border-radius:50%;background:#f09199;}\n" +
+                ".brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.3px;}\n" +
+                ".brand .dot{width:10px;height:10px;border-radius:50%;background:#f09199;box-shadow:0 0 12px rgba(240,145,153,.6);}\n" +
                 ".chips{display:flex;gap:8px;flex-wrap:wrap;}\n" +
                 ".chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;background:#1e293b;color:#94a3b8;border:1px solid #334155;}\n" +
                 ".chip.pink{background:rgba(240,145,153,.12);color:#f09199;border-color:rgba(240,145,153,.35);}\n" +
                 ".chip.green{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.35);}\n" +
                 ".chip.gold{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.35);}\n" +
+                ".chip.nsfw{background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.4);font-size:11px;}\n" +
                 ".btn{padding:7px 14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;cursor:pointer;transition:.15s;font-family:inherit;}\n" +
-                ".btn:hover{background:#334155;}\n" +
+                ".btn:hover{background:#334155;transform:translateY(-1px);}\n" +
                 ".btn.primary{background:#6366f1;border-color:#6366f1;}\n" +
                 ".btn.primary:hover{background:#4f46e5;}\n" +
                 ".btn.danger:hover{background:#7f1d1d;border-color:#ef4444;}\n" +
+                ".btn.ghost{background:transparent;}\n" +
                 ".btnrow{display:flex;gap:8px;flex-wrap:wrap;}\n" +
                 ".card{background:#10161f;border:1px solid #1e293b;border-radius:14px;padding:20px;}\n" +
+                ".hero{position:relative;overflow:hidden;border:1px solid #1e293b;border-radius:16px;margin-bottom:20px;background:#0d131c;}\n" +
+                ".hero-bg{position:absolute;inset:-24px;background-size:cover;background-position:center 25%;filter:blur(30px) brightness(.42) saturate(1.25);transform:scale(1.12);}\n" +
+                ".hero-fade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,13,20,.15) 0%,rgba(9,13,20,.78) 65%,rgba(9,13,20,.95) 100%);}\n" +
+                ".hero-in{position:relative;display:flex;gap:22px;padding:26px;align-items:flex-end;min-height:210px;}\n" +
+                ".hero-cover{width:168px;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:#1e293b;box-shadow:0 10px 34px rgba(0,0,0,.55);flex-shrink:0;cursor:zoom-in;}\n" +
+                ".hero-txt{min-width:0;padding-bottom:4px;}\n" +
+                ".hero-txt h1{font-size:26px;margin:0 0 6px;line-height:1.3;text-shadow:0 2px 12px rgba(0,0,0,.6);}\n" +
+                ".hero-jp{font-size:15px;color:#c3cbd8;font-weight:500;}\n" +
+                ".hero-al{font-size:12px;color:#8b96a8;margin-top:3px;}\n" +
+                ".nextep{display:inline-block;margin-top:10px;padding:3px 12px;border-radius:999px;font-size:12px;background:rgba(99,102,241,.16);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);}\n" +
+                "@media(max-width:680px){.hero-in{flex-direction:column;align-items:flex-start;min-height:0;}.hero-cover{width:120px;}}\n" +
                 ".grid{display:grid;grid-template-columns:260px 1fr;gap:24px;}\n" +
                 "@media(max-width:760px){.grid{grid-template-columns:1fr;}}\n" +
-                ".cover{width:100%;border-radius:10px;background:#1e293b;aspect-ratio:3/4;object-fit:cover;display:block;}\n" +
-                ".scorebox{text-align:center;margin-top:16px;padding:14px;background:#0b0f16;border-radius:12px;border:1px solid #1e293b;}\n" +
-                ".score-num{font-size:40px;font-weight:800;line-height:1.1;}\n" +
-                ".score-max{font-size:14px;color:#64748b;}\n" +
+                ".scorebox{padding:16px;background:#0b0f16;border-radius:12px;border:1px solid #1e293b;}\n" +
+                ".scorerow{display:flex;align-items:center;gap:16px;justify-content:center;}\n" +
+                ".score-num{font-size:42px;font-weight:800;line-height:1.05;}\n" +
+                ".score-max{font-size:14px;color:#64748b;font-weight:500;}\n" +
+                ".scoresub{display:flex;flex-direction:column;align-items:flex-start;}\n" +
                 ".muted{color:#94a3b8;}\n" +
                 ".small{font-size:12px;}\n" +
-                "h1{font-size:24px;margin:0 0 4px;line-height:1.3;}\n" +
-                "h2{font-size:15px;color:#94a3b8;font-weight:500;margin:0 0 12px;}\n" +
                 "h3{font-size:15px;margin:22px 0 10px;padding-left:10px;border-left:3px solid #f09199;}\n" +
-                ".meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin:14px 0;}\n" +
+                ".meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin:4px 0 14px;}\n" +
                 ".meta .k{font-size:12px;color:#64748b;}\n" +
                 ".meta .v{font-weight:600;}\n" +
                 ".tagrow{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;}\n" +
                 ".summary{color:#cbd5e1;white-space:pre-wrap;}\n" +
                 ".dist-row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11px;}\n" +
                 ".dist-row .n{width:14px;text-align:right;color:#64748b;}\n" +
-                ".dist-bar{height:8px;border-radius:4px;background:linear-gradient(90deg,#f09199,#f43f5e);min-width:2px;}\n" +
+                ".dist-bar{height:8px;border-radius:4px;background:linear-gradient(90deg,#f09199,#f43f5e);min-width:2px;transition:width .4s ease;}\n" +
                 ".dist-row .c{width:36px;color:#64748b;}\n" +
-                ".tabs{display:flex;gap:4px;border-bottom:1px solid #1e293b;margin-top:24px;}\n" +
-                ".tab{padding:8px 16px;cursor:pointer;border:none;background:none;color:#94a3b8;font-size:14px;border-bottom:2px solid transparent;font-family:inherit;}\n" +
+                ".tabs{display:flex;gap:4px;border-bottom:1px solid #1e293b;margin-top:24px;position:sticky;top:0;background:rgba(9,13,20,.82);backdrop-filter:blur(10px);z-index:20;border-radius:10px 10px 0 0;}\n" +
+                ".tab{padding:10px 18px;cursor:pointer;border:none;background:none;color:#94a3b8;font-size:14px;border-bottom:2px solid transparent;font-family:inherit;transition:.15s;}\n" +
+                ".tab:hover{color:#e2e8f0;}\n" +
                 ".tab.active{color:#f09199;border-bottom-color:#f09199;font-weight:600;}\n" +
                 ".cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;margin-top:14px;}\n" +
-                ".citem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;overflow:hidden;text-align:center;}\n" +
+                ".citem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;overflow:hidden;text-align:center;cursor:zoom-in;transition:transform .15s,border-color .15s;}\n" +
+                ".citem:hover{transform:translateY(-3px);border-color:rgba(240,145,153,.4);}\n" +
                 ".cimg{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:#1e293b;}\n" +
                 ".cname{padding:6px 6px 2px;font-size:12px;font-weight:600;line-height:1.3;}\n" +
                 ".crel{padding:0 6px 6px;font-size:11px;color:#f09199;}\n" +
                 ".ccv{padding:0 6px 8px;font-size:11px;color:#64748b;}\n" +
                 ".eptable{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}\n" +
-                ".eptable td{padding:6px 10px;border-bottom:1px solid #1e293b;}\n" +
-                ".eptable tr:hover td{background:#0b0f16;}\n" +
+                ".eptable td{padding:7px 10px;border-bottom:1px solid #1e293b;}\n" +
+                ".eptable tr:nth-child(even) td{background:rgba(148,163,184,.03);}\n" +
+                ".eptable tr:hover td{background:#141b26;}\n" +
                 ".epnum{width:50px;color:#f09199;font-weight:700;}\n" +
-                ".epdate{width:100px;color:#64748b;font-size:12px;}\n" +
-                ".relgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:14px;}\n" +
-                ".relitem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;padding:10px;}\n" +
+                ".epdate{width:110px;color:#64748b;font-size:12px;text-align:right;}\n" +
+                ".relgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:14px;}\n" +
+                ".relitem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;padding:10px;transition:border-color .15s;}\n" +
+                ".relitem:hover{border-color:rgba(240,145,153,.35);}\n" +
                 ".relname{font-size:13px;font-weight:600;line-height:1.35;margin-top:4px;}\n" +
                 ".reltype{font-size:11px;color:#f09199;}\n" +
+                ".relbtns{display:flex;gap:6px;margin-top:8px;}\n" +
                 ".center{text-align:center;padding:60px 20px;}\n" +
                 ".spinner{width:36px;height:36px;border:3px solid #1e293b;border-top-color:#f09199;border-radius:50%;margin:0 auto 16px;animation:spin 1s linear infinite;}\n" +
                 "@keyframes spin{to{transform:rotate(360deg);}}\n" +
@@ -785,18 +813,16 @@ function init() {
                 ".input{flex:1;min-width:180px;padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#10161f;color:#e2e8f0;font-size:13px;font-family:inherit;}\n" +
                 ".input:focus{outline:none;border-color:#6366f1;}\n" +
                 ".srow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}\n" +
-                ".sresult{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid #1e293b;border-radius:8px;margin-top:6px;background:#10161f;}\n" +
+                ".sresult{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #1e293b;border-radius:8px;margin-top:6px;background:#10161f;}\n" +
                 ".sresult:hover{border-color:#f09199;}\n" +
+                ".sthumb{width:40px;height:54px;object-fit:cover;border-radius:6px;background:#1e293b;flex-shrink:0;}\n" +
+                ".sinfo{flex:1;min-width:0;}\n" +
                 ".ibox{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}\n" +
                 ".ibox td{padding:4px 8px;border-bottom:1px solid #1e293b;vertical-align:top;}\n" +
                 ".ibox td:first-child{color:#64748b;width:90px;white-space:nowrap;}\n" +
                 ".warnbox{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 16px;margin-top:12px;font-size:13px;color:#fbbf24;}\n" +
-                ".zoombg{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer;}\n" +
+                ".zoombg{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadein .15s ease;}\n" +
                 ".zoombg img{max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.6);cursor:default;display:block;object-fit:contain;}\n" +
-                ".zoombg .zoomclose{position:absolute;top:16px;right:24px;color:#fff;font-size:32px;cursor:pointer;line-height:1;opacity:.7;}\n" +
-                ".zoombg .zoomclose:hover{opacity:1;}\n" +
-                ".citem{cursor:pointer;transition:transform .15s;}\n" +
-                ".citem:hover{transform:translateY(-2px);}\n" +
                 "</style>\n" +
                 "</head>\n" +
                 "<body>\n" +
@@ -902,32 +928,63 @@ function init() {
                 "      '<div class=\"muted small\" style=\"margin-top:4px;\">请在下方手动搜索，或直接输入 Bangumi ID / 链接绑定</div></div>';\n" +
                 "  }\n" +
                 "  function renderReady(){\n" +
-                "    var s=vm.subject,e=vm.entry||{title:'',cover:'',score:0,year:0};\n" +
-                "    var h='<div class=\"card\"><div class=\"grid\">';\n" +
-                "    h+='<div>'+renderCover(s,e)+renderScoreBox(s,e)+renderStats(s)+renderCollection()+'</div>';\n" +
-                "    h+='<div>'+renderTitleBlock(s)+renderMeta(s)+renderTags(s)+renderSummary(s)+renderInfobox(s)+'</div>';\n" +
+                "    var s=vm.subject,e=vm.entry||{titles:[],cover:'',banner:'',score:0,year:0};\n" +
+                "    var h='<div class=\"fade\">';\n" +
+                "    h+=renderHero(s,e);\n" +
+                "    h+='<div class=\"card\"><div class=\"grid\">';\n" +
+                "    h+='<div>'+renderScoreBox(s,e)+renderStats(s)+renderCollection()+'</div>';\n" +
+                "    h+='<div>'+renderMeta(s)+renderTags(s)+renderSummary(s)+renderInfobox(s)+'</div>';\n" +
                 "    h+='</div></div>';\n" +
                 "    h+=renderTabs();\n" +
+                "    return h+'</div>';\n" +
+                "  }\n" +
+                "  function renderHero(s,e){\n" +
+                "    var cov=(s.images&&(s.images.large||s.images.common||s.images.medium))||e.cover||'';\n" +
+                "    var bg=e.banner||cov;\n" +
+                "    var h='<div class=\"hero\">';\n" +
+                "    if(bg)h+='<div class=\"hero-bg\" style=\"background-image:url(\\''+esc(bg)+'\\');\"></div>';\n" +
+                "    h+='<div class=\"hero-fade\"></div>';\n" +
+                "    h+='<div class=\"hero-in\">';\n" +
+                "    if(cov)h+='<img class=\"hero-cover\" src=\"'+esc(cov)+'\" data-action=\"zoom-img\" data-fullsrc=\"'+esc(cov)+'\" onerror=\"this.style.display=\\'none\\';\" referrerpolicy=\"no-referrer\">';\n" +
+                "    h+='<div class=\"hero-txt\">';\n" +
+                "    h+='<h1>'+esc(s.name_cn||s.name||'未知标题');\n" +
+                "    if(s.nsfw)h+=' <span class=\"chip nsfw\">NSFW</span>';\n" +
+                "    h+='</h1>';\n" +
+                "    if(s.name&&s.name!==(s.name_cn||''))h+='<div class=\"hero-jp\">'+esc(s.name)+'</div>';\n" +
+                "    if(e.titles&&e.titles.length&&e.titles[0]!==(s.name||''))h+='<div class=\"hero-al\">AniList: '+esc(e.titles[0])+'</div>';\n" +
+                "    h+=nextEpLine();\n" +
+                "    h+='</div></div></div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
-                "  function renderCover(s,e){\n" +
-                "    var img=(s.images&&(s.images.large||s.images.common||s.images.medium))||'';\n" +
-                "    var fb=e.cover||'';\n" +
-                "    var onerr=fb?(\"this.onerror=function(){this.style.display='none';};this.src='\"+esc(fb)+\"';\"):\"this.style.display='none';\";\n" +
-                "    if(!img&&fb){img=fb;onerr=\"this.style.display='none';\";}\n" +
-                "    if(!img)return '<div class=\"cover\"></div>';\n" +
-                "    return '<img class=\"cover\" src=\"'+esc(img)+'\" onerror=\"'+onerr+'\" referrerpolicy=\"no-referrer\">';\n" +
+                "  function nextEpLine(){\n" +
+                "    if(!vm.eps||!vm.eps.length)return '';\n" +
+                "    var d=new Date();\n" +
+                "    var p=function(n){return (n<10?'0':'')+n;};\n" +
+                "    var today=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());\n" +
+                "    var nx=null;\n" +
+                "    for(var i=0;i<vm.eps.length;i++){\n" +
+                "      var ad=vm.eps[i].air_date;\n" +
+                "      if(ad&&ad>=today&&(!nx||ad<(nx.air_date||'')))nx=vm.eps[i];\n" +
+                "    }\n" +
+                "    if(!nx)return '';\n" +
+                "    var nlabel=(nx.air_date===today?'今天播出':'下一话')+' 第'+(nx.sort!=null?nx.sort:'?')+'话';\n" +
+                "    if(nx.air_date!==today)nlabel+=' · '+nx.air_date;\n" +
+                "    return '<div class=\"nextep\">'+esc(nlabel)+'</div>';\n" +
                 "  }\n" +
                 "  function renderScoreBox(s,e){\n" +
                 "    var r=s.rating||{};\n" +
                 "    var sc=num(r.score);\n" +
                 "    var h='<div class=\"scorebox\">';\n" +
+                "    h+='<div class=\"scorerow\">';\n" +
                 "    if(sc>0){\n" +
                 "      h+='<div class=\"score-num\" style=\"color:'+scoreColor(sc)+'\">'+sc.toFixed(1)+'<span class=\"score-max\"> /10</span></div>';\n" +
-                "      if(r.rank)h+='<div class=\"chip gold\" style=\"margin-top:6px;\">Rank #'+r.rank+'</div>';\n" +
+                "      h+='<div class=\"scoresub\">';\n" +
+                "      if(r.rank)h+='<div class=\"chip gold\">Rank #'+r.rank+'</div>';\n" +
                 "      if(r.total)h+='<div class=\"muted small\" style=\"margin-top:6px;\">'+r.total+' 人评分</div>';\n" +
+                "      h+='</div>';\n" +
                 "    }else{h+='<div class=\"muted\">暂无评分</div>';}\n" +
-                "    if(e.score){h+='<div class=\"muted small\" style=\"margin-top:8px;\">AniList '+(e.score/10).toFixed(1)+' /10</div>';}\n" +
+                "    h+='</div>';\n" +
+                "    if(e.score){h+='<div class=\"muted small\" style=\"margin-top:8px;text-align:center;\">AniList '+(e.score/10).toFixed(1)+' /10</div>';}\n" +
                 "    h+=renderDist(r.count);\n" +
                 "    h+='</div>';\n" +
                 "    return h;\n" +
@@ -966,15 +1023,6 @@ function init() {
                 "    var h='<div style=\"margin-top:10px;text-align:center;\">'+chip('我: '+label,'pink');\n" +
                 "    if(col.rate)h+=' '+chip('我的评分 '+col.rate,'gold');\n" +
                 "    h+='</div>';\n" +
-                "    return h;\n" +
-                "  }\n" +
-                "  function renderTitleBlock(s){\n" +
-                "    var h='';\n" +
-                "    h+='<h1>'+esc(s.name_cn||s.name||'未知标题');\n" +
-                "    if(s.nsfw)h+=' <span class=\"chip\" style=\"background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.4);font-size:11px;\">NSFW</span>';\n" +
-                "    h+='</h1>';\n" +
-                "    if(s.name&&s.name!==(s.name_cn||''))h+='<h2>'+esc(s.name)+'</h2>';\n" +
-                "    if(vm.entry&&vm.entry.titles&&vm.entry.titles.length)h+='<div class=\"muted small\">AniList: '+esc(vm.entry.titles[0])+'</div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
                 "  function renderMeta(s){\n" +
@@ -1042,9 +1090,9 @@ function init() {
                 "    return h;\n" +
                 "  }\n" +
                 "  function renderChars(){\n" +
-                "    if(!vm.chars)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.chars===null?'加载中或暂无数据':'')+'</div>';\n" +
+                "    if(!vm.chars||!vm.chars.length)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.chars===null?'加载中…':'暂无角色数据')+'</div>';\n" +
                 "    var h='<div class=\"cgrid\">';\n" +
-                "    for(var i=0;i<vm.chars.length&&i<18;i++){\n" +
+                "    for(var i=0;i<vm.chars.length&&i<24;i++){\n" +
                 "      var c=vm.chars[i];\n" +
                 "      var img=(c.images&&(c.images.medium||c.images.small||c.images.grid))||'';\n" +
                 "      var full=(c.images&&c.images.large)||img;\n" +
@@ -1052,13 +1100,17 @@ function init() {
                 "      if(img)h+=\"<img class='cimg' src='\"+esc(img)+\"' data-action='zoom-img' data-fullsrc='\"+esc(full)+\"' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
                 "      h+='<div class=\"cname\">'+esc(c.name)+'</div>';\n" +
                 "      if(c.relation)h+='<div class=\"crel\">'+esc(c.relation)+'</div>';\n" +
-                "      if(c.actors&&c.actors.length&&c.actors[0].name)h+='<div class=\"ccv\">CV: '+esc(c.actors[0].name)+'</div>';\n" +
+                "      if(c.actors&&c.actors.length){\n" +
+                "        var an=[];\n" +
+                "        for(var a=0;a<c.actors.length&&a<2;a++){if(c.actors[a]&&c.actors[a].name)an.push(c.actors[a].name);}\n" +
+                "        if(an.length)h+='<div class=\"ccv\">CV: '+esc(an.join(' / '))+'</div>';\n" +
+                "      }\n" +
                 "      h+='</div>';\n" +
                 "    }\n" +
                 "    return h+'</div>';\n" +
                 "  }\n" +
                 "  function renderEps(){\n" +
-                "    if(!vm.eps)return '<div class=\"muted center\" style=\"padding:30px;\"></div>';\n" +
+                "    if(!vm.eps||!vm.eps.length)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.eps===null?'加载中…':'暂无章节数据')+'</div>';\n" +
                 "    var h='<table class=\"eptable\">';\n" +
                 "    for(var i=0;i<vm.eps.length;i++){\n" +
                 "      var ep=vm.eps[i];\n" +
@@ -1072,19 +1124,20 @@ function init() {
                 "  }\n" +
                 "  function escnm(s){return esc(s);}\n" +
                 "  function renderRels(){\n" +
-                "    if(!vm.rels)return '<div class=\"muted center\" style=\"padding:30px;\"></div>';\n" +
+                "    if(!vm.rels||!vm.rels.length)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.rels===null?'加载中…':'暂无关联条目')+'</div>';\n" +
                 "    var h='<div class=\"relgrid\">';\n" +
-                "    for(var i=0;i<vm.rels.length&&i<18;i++){\n" +
+                "    for(var i=0;i<vm.rels.length&&i<24;i++){\n" +
                 "      var r=vm.rels[i];\n" +
                 "      var img=(r.images&&(r.images.small||r.images.grid))||'';\n" +
                 "      h+='<div class=\"relitem\">';\n" +
                 "      if(r.relation)h+='<div class=\"reltype\">'+esc(r.relation)+'</div>';\n" +
                 "      h+='<div style=\"display:flex;gap:8px;margin-top:4px;\">';\n" +
-                "      if(img)h+=\"<img src='\"+esc(img)+\"' style='width:34px;height:46px;object-fit:cover;border-radius:4px;background:#1e293b;' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
+                "      if(img)h+=\"<img src='\"+esc(img)+\"' style='width:34px;height:46px;object-fit:cover;border-radius:4px;background:#1e293b;flex-shrink:0;' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
                 "      h+='<div class=\"relname\">'+esc(r.name_cn||r.name);\n" +
                 "      if(r.name_cn&&r.name&&r.name!==r.name_cn)h+='<div class=\"muted small\">'+esc(r.name)+'</div>';\n" +
                 "      h+='</div></div>';\n" +
-                "      h+='<div style=\"margin-top:6px;\"><button class=\"btn small\" data-action=\"bind-pick\" data-payload=\"'+r.id+'\">绑定此项</button></div>';\n" +
+                "      h+='<div class=\"relbtns\"><button class=\"btn small\" data-action=\"bind-pick\" data-payload=\"'+r.id+'\" title=\"Bind This Entry\">绑定此项</button>';\n" +
+                "      h+='<button class=\"btn small ghost\" data-action=\"open-bgm\" data-payload=\"'+r.id+'\" title=\"Open in Bangumi\">打开</button></div>';\n" +
                 "      h+='</div>';\n" +
                 "    }\n" +
                 "    return h+'</div>';\n" +
@@ -1102,7 +1155,10 @@ function init() {
                 "        var lbl=(r.name_cn||r.name||'未知');\n" +
                 "        if(r.date)lbl+=' · '+String(r.date).substring(0,4);\n" +
                 "        if(r.rating&&r.rating.score){var rs=num(r.rating.score);if(rs>0)lbl+=' · '+rs.toFixed(1)+'分';}\n" +
-                "        h+='<div class=\"sresult\"><span>'+esc(lbl)+(r.name_cn&&r.name&&r.name!==r.name_cn?'<div class=\"muted small\">'+esc(r.name)+'</div>':'')+'</span>';\n" +
+                "        var simg=(r.images&&(r.images.grid||r.images.small))||'';\n" +
+                "        h+='<div class=\"sresult\">';\n" +
+                "        if(simg)h+=\"<img class='sthumb' src='\"+esc(simg)+\"' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
+                "        h+='<span class=\"sinfo\">'+esc(lbl)+(r.name_cn&&r.name&&r.name!==r.name_cn?'<div class=\"muted small\">'+esc(r.name)+'</div>':'')+'</span>';\n" +
                 "        h+='<button class=\"btn primary\" data-action=\"bind-pick\" data-payload=\"'+r.id+'\">绑定</button></div>';\n" +
                 "      }\n" +
                 "      h+='</div>';\n" +

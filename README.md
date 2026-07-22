@@ -8,7 +8,7 @@
 
 ---
 
-## 📦 Extension List
+##  Extension List
 
 | Extension | Type | Description |
 |-----------|------|-------------|
@@ -20,7 +20,7 @@
 
 ---
 
-## 🚀 Installation
+##  Installation
 
 ### Method 1: Install from GitHub (Recommended)
 
@@ -129,7 +129,7 @@ A **manga provider** extension for **Chinese manga sources** from Baozi.
 
 ---
 
-## 📄 License
+##  License
 
 MIT License
 

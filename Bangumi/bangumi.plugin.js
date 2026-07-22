@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v1.1.2");
+        console.log("[bangumi-ui] 插件已加载 v3.2.5");
         // =================================================================
         //  Constants
         // =================================================================
@@ -104,8 +104,10 @@ function init() {
             var url = eps[i] + path;
             var left = retries === undefined ? 2 : retries;
             return ctx.fetch(url, { headers: hdrs() }).then(function (r) {
-                // Token 无效时去掉 Authorization 重试一次
-                if (r && r.status === 401 && pref("accessToken", "")) {
+                // Token 无效时去掉 Authorization 重试一次（仅限公开路径；
+                // 用户私有路径必须保留 401，否则 tokenInvalid 检测会被掩盖）
+                var isPrivate = path.indexOf("/v0/me") === 0 || path.indexOf("/v0/users/-") === 0;
+                if (r && r.status === 401 && !isPrivate && pref("accessToken", "")) {
                     console.log("[bangumi-ui] 401 (token 无效), 去掉 token 重试");
                     return ctx.fetch(url, { headers: hdrsNoAuth() }).then(function (r2) { return handleGetResp(r2, eps, i, path, left); }, function () { return tryGet(eps, i + 1, path); });
                 }
@@ -566,14 +568,43 @@ function init() {
                 patchVm({ status: "error", errorMsg: "无法连接 Bangumi（可在插件设置中配置镜像端点）" });
             });
         }
+        function normalizeEps(data) {
+            if (!data)
+                return null;
+            if (Array.isArray(data))
+                return data;
+            // 兼容旧版缓存格式 {data: [...]}
+            if (data.data && Array.isArray(data.data))
+                return data.data;
+            return null;
+        }
         // ---- Extras: characters / episodes / relations (fault-tolerant) ----
+        function fetchAllEpisodes(sid, offset, collected) {
+            return apiGet("/v0/episodes?subject_id=" + sid + "&type=0&limit=100&offset=" + offset).then(function (r) {
+                if (!r)
+                    return collected;
+                var page = null;
+                try {
+                    page = r.json();
+                }
+                catch (_) {
+                    page = null;
+                }
+                if (!page || !page.data || !page.data.length)
+                    return collected;
+                var merged = collected.concat(page.data);
+                if (page.data.length < 100 || merged.length >= 2000)
+                    return merged;
+                return fetchAllEpisodes(sid, offset + 100, merged);
+            }, function () { return collected; });
+        }
         function loadExtras(sid, seq) {
             var stale = function () { return seq !== reqSeq; };
             var cachedX = xGet(sid);
             if (cachedX) {
                 patchVm({
                     chars: cachedX.chars || null,
-                    eps: cachedX.eps || null,
+                    eps: normalizeEps(cachedX.eps),
                     rels: cachedX.rels || null
                 });
                 return;
@@ -585,7 +616,7 @@ function init() {
                 ? apiGet("/v0/subjects/" + sid + "/characters").then(function (r) { return r ? r.json() : null; }, function () { return null; })
                 : Promise.resolve(null);
             var pEps = wantEps
-                ? apiGet("/v0/episodes?subject_id=" + sid + "&type=0&limit=100&offset=0").then(function (r) { return r ? r.json() : null; }, function () { return null; })
+                ? fetchAllEpisodes(sid, 0, [])
                 : Promise.resolve(null);
             var pRels = wantRels
                 ? apiGet("/v0/subjects/" + sid + "/subjects").then(function (r) { return r ? r.json() : null; }, function () { return null; })
@@ -594,7 +625,7 @@ function init() {
                 if (stale())
                     return;
                 var chars = arr[0] && arr[0].length ? arr[0] : null;
-                var epsData = arr[1] && arr[1].data && arr[1].data.length ? arr[1].data : null;
+                var epsData = normalizeEps(arr[1]);
                 var rels = arr[2] && arr[2].length ? arr[2] : null;
                 xSet(sid, { chars: chars, eps: epsData, rels: rels });
                 patchVm({ chars: chars, eps: epsData, rels: rels });
@@ -607,8 +638,17 @@ function init() {
                 return;
             var stale = function () { return seq !== reqSeq; };
             var cachedUser = $storage.get("bangumi.me");
-            var pUser = cachedUser
-                ? Promise.resolve(JSON.parse(String(cachedUser)))
+            var meCached = null;
+            if (cachedUser) {
+                try {
+                    meCached = JSON.parse(String(cachedUser));
+                }
+                catch (_) {
+                    meCached = null;
+                }
+            }
+            var pUser = meCached
+                ? Promise.resolve(meCached)
                 : apiGet("/v0/me").then(function (r) {
                     if (r && r.status === 401) {
                         patchVm({ tokenInvalid: true });
@@ -939,6 +979,10 @@ function init() {
                 ".pbtn{width:26px;height:26px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px;cursor:pointer;line-height:1;font-family:inherit;}\n" +
                 ".pbtn:hover{background:#334155;}\n" +
                 ".progtxt{font-size:12px;color:#cbd5e1;min-width:110px;text-align:center;}\n" +
+                ".pgnrow{display:flex;gap:4px;justify-content:center;margin-top:16px;flex-wrap:wrap;}\n" +
+                ".pgnbtn{width:32px;height:32px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:13px;cursor:pointer;font-family:inherit;}\n" +
+                ".pgnbtn:hover{background:#334155;color:#e2e8f0;}\n" +
+                ".pgnbtn.active{background:#6366f1;border-color:#6366f1;color:#fff;}\n" +
                 "</style>\n" +
                 "</head>\n" +
                 "<body>\n" +
@@ -953,13 +997,16 @@ function init() {
                 "  }\n" +
                 "  var vm=null;\n" +
                 "  var gotFirst=false;\n" +
-                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null,pendingStatus=null;\n" +
+                "  var lastSid=0;\n" +
+                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null,pendingStatus=null,epsPage=1;\n" +
                 "  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n" +
                 "  function num(x){var n=Number(x);return isNaN(n)?0:n;}\n" +
                 "  window.webview.on('vm',function(v){\n" +
                 "    gotFirst=true;\n" +
                 "    pendingEp=null;\n" +
                 "    pendingStatus=null;\n" +
+                "    var sid=(v&&v.subjectId)||0;\n" +
+                "    if(sid!==lastSid){lastSid=sid;epsPage=1;}\n" +
                 "    var si=document.getElementById('bgm-q');if(si)searchVal=si.value;\n" +
                 "    var ii=document.getElementById('bgm-id');if(ii)idVal=ii.value;\n" +
                 "    var y=window.scrollY||0;\n" +
@@ -1252,18 +1299,30 @@ function init() {
                 "  }\n" +
                 "  function renderEps(){\n" +
                 "    if(!vm.eps||!vm.eps.length)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.eps===null?'加载中…':'暂无章节数据')+'</div>';\n" +
+                "    var total=Math.ceil(vm.eps.length/100);\n" +
+                "    if(epsPage<1)epsPage=1;\n" +
+                "    if(epsPage>total)epsPage=total;\n" +
+                "    var start=(epsPage-1)*100;\n" +
+                "    var slice=vm.eps.slice(start,start+100);\n" +
                 "    var h='<table class=\"eptable\">';\n" +
-                "    for(var i=0;i<vm.eps.length;i++){\n" +
-                "      var ep=vm.eps[i];\n" +
+                "    for(var i=0;i<slice.length;i++){\n" +
+                "      var ep=slice[i];\n" +
                 "      var nm=ep.name_cn||ep.name||'';\n" +
                 "      var sub=(ep.name_cn&&ep.name&&ep.name!==ep.name_cn)?ep.name:'';\n" +
-                "      h+='<tr><td class=\"epnum\">'+(ep.sort!=null?ep.sort:(i+1))+'</td><td>'+escnm(nm);\n" +
-                "      if(sub)h+='<div class=\"muted small\">'+escnm(sub)+'</div>';\n" +
+                "      h+='<tr><td class=\"epnum\">'+(ep.sort!=null?ep.sort:(start+i+1))+'</td><td>'+esc(nm);\n" +
+                "      if(sub)h+='<div class=\"muted small\">'+esc(sub)+'</div>';\n" +
                 "      h+='</td><td class=\"epdate\">'+esc(ep.air_date||'')+'</td></tr>';\n" +
                 "    }\n" +
-                "    return h+'</table>';\n" +
+                "    h+='</table>';\n" +
+                "    if(total>1){\n" +
+                "      h+='<div class=\"pgnrow\">';\n" +
+                "      for(var p=1;p<=total;p++){\n" +
+                "        h+='<button class=\"pgnbtn'+(p===epsPage?' active':'')+'\" data-action=\"eps-page\" data-payload=\"'+p+'\">'+p+'</button>';\n" +
+                "      }\n" +
+                "      h+='</div>';\n" +
+                "    }\n" +
+                "    return h;\n" +
                 "  }\n" +
-                "  function escnm(s){return esc(s);}\n" +
                 "  function renderRels(){\n" +
                 "    if(!vm.rels||!vm.rels.length)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.rels===null?'加载中…':'暂无关联条目')+'</div>';\n" +
                 "    var h='<div class=\"relgrid\">';\n" +
@@ -1331,6 +1390,10 @@ function init() {
                 "          pendingEp=null;\n" +
                 "          render();\n" +
                 "          window.webview.send('set-status',p);\n" +
+                "        }\n" +
+                "        else if(a==='eps-page'){\n" +
+                "          epsPage=parseInt(p,10)||1;\n" +
+                "          render();\n" +
                 "        }\n" +
                 "        else if(a==='prog-inc'||a==='prog-dec'){\n" +
                 "          var col0=vm&&vm.collection;\n" +

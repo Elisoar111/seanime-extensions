@@ -1,3 +1,5 @@
+/// <reference path="./anime-torrent-provider.d.ts" />
+
 class Provider {
 
     constructor() {
@@ -12,7 +14,7 @@ class Provider {
     getSettings() {
         return {
             canSmartSearch: true,
-            smartSearchFilters: ["batch", "episodeNumber", "resolution", "bestReleases"],
+            smartSearchFilters: ["batch", "episodeNumber", "resolution", "query", "bestReleases"],
             supportsAdult: false,
             type: "main",
         }

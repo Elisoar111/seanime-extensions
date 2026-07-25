@@ -18,7 +18,7 @@
         "name": "baseUrl",
         "label": "蜜柑站点地址",
         "type": "text",
-        "default": "https://mikanime.tv",
+        "default": "https://mikanani.kas.pub/",
         "description": "站点无法访问时替换镜像域名"
       }
     ]

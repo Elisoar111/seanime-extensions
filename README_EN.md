@@ -1,6 +1,5 @@
 # seanime-extensions
 
-[![GitHub stars](https://img.shields.io/github/stars/Elisoar111/seanime-extensions)](https://github.com/Elisoar111/seanime-extensions/stargazers)
 
 > **English | [中文](./README.md)**
 

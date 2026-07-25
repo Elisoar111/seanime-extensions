@@ -5,7 +5,7 @@ class Provider {
 
     getSettings() {
         return {
-            episodeServers: ["叽哔1线", "叽哔2线", "叽哔3线", "叽哔4线", "叽哔5线"],
+            episodeServers: ["\u5429\u54D41\u7EBF", "\u5429\u54D42\u7EBF", "\u5429\u54D43\u7EBF", "\u5429\u54D44\u7EBF", "\u5429\u54D45\u7EBF"],
             supportsDub: false,
         }
     }
@@ -16,54 +16,63 @@ class Provider {
             if (!q) return []
             console.log("[Jibi] search:", q)
 
-            var results = [], seen = {}
-            var html = await this._fetch(this.base + "/index.php/vod/search.html?wd=" + encodeURIComponent(q))
-            if (!html) return []
-
-            var re = /<a[^>]*href="\/index\.php\/vod\/detail\/id\/(\d+)\.html"[^>]*>([^<]+)<\/a>/g, m
-            while ((m = re.exec(html)) !== null) {
-                var title = m[2].trim()
-                if (!title || seen[m[1]]) continue
-                seen[m[1]] = true
-                if (title.indexOf("查看") >= 0 || title.indexOf("详情") >= 0) continue
-                results.push({
-                    id: m[1],
-                    title: title,
-                    url: this.base + "/index.php/vod/detail/id/" + m[1] + ".html",
-                    subOrDub: "sub"
-                })
-                if (results.length >= 30) break
+            // Strategy 1: Suggest API
+            var url = this.base + "/index.php/ajax/suggest?mid=1&wd=" + encodeURIComponent(q) + "&limit=10"
+            var res = await fetch(url, { headers: this._headers() })
+            if (res && res.ok) {
+                var raw = await res.text()
+                console.log("[Jibi] suggest raw:", raw.slice(0, 150))
+                var data = JSON.parse(raw)
+                if (data && data.code === 1 && data.list && data.list.length) {
+                    var results = []
+                    for (var i = 0; i < data.list.length; i++) {
+                        results.push({
+                            id: String(data.list[i].id),
+                            title: data.list[i].name,
+                            url: this.base + "/index.php/vod/detail/id/" + data.list[i].id + ".html",
+                            subOrDub: "sub"
+                        })
+                    }
+                    console.log("[Jibi] found " + results.length + " results")
+                    return results
+                }
             }
 
-            var ql = q.toLowerCase()
-            results.sort(function(a, b) {
-                var at = a.title.toLowerCase(), bt = b.title.toLowerCase()
-                var sa = this._score(at, ql), sb = this._score(bt, ql)
-                return sb - sa
-            }.bind(this))
+            // Strategy 2: Try HTML search page (fallback)
+            console.log("[Jibi] suggest failed, trying search page")
+            var html = await this._fetch(this.base + "/index.php/vod/search.html?wd=" + encodeURIComponent(q))
+            if (html) {
+                // Look for detail links with numeric IDs
+                var linkRe = /href="\/index\.php\/vod\/detail\/id\/(\d+)\.html"[^>]*>.*?<\/a>/g
+                var results2 = [], seen2 = {}, m
+                while ((m = linkRe.exec(html)) !== null) {
+                    if (seen2[m[1]]) continue
+                    seen2[m[1]] = true
+                    // Try to extract title from the link context
+                    var ctx = html.slice(Math.max(0, m.index - 200), m.index + 200)
+                    var titleMatch = ctx.match(/alt="([^"]+)"/) || ctx.match(/title="([^"]+)"/)
+                    var title = titleMatch ? titleMatch[1] : "Anime " + m[1]
+                    if (title.indexOf("\u67E5\u770B") >= 0 || title.indexOf("\u8BE6\u60C5") >= 0) continue
+                    results2.push({
+                        id: m[1],
+                        title: title,
+                        url: this.base + "/index.php/vod/detail/id/" + m[1] + ".html",
+                        subOrDub: "sub"
+                    })
+                    if (results2.length >= 30) break
+                }
+                if (results2.length) {
+                    console.log("[Jibi] found " + results2.length + " results (page)")
+                    return results2
+                }
+            }
 
-            console.log("[Jibi] found " + results.length + " results")
-            return results
+            console.log("[Jibi] no results")
+            return []
         } catch (e) {
-            console.error("[Jibi] search error:", e)
+            console.error("[Jibi] search error:", e.message)
             return []
         }
-    }
-
-    _score(title, query) {
-        if (title === query) return 100
-        if (title.indexOf(query) === 0) return 80
-        if (title.indexOf(query) > 0) return 60
-        var words = query.split(/[\s:\u3001\u3000\uff0c,]+/)
-        if (words.length > 1) {
-            var matched = 0
-            for (var i = 0; i < words.length; i++) {
-                if (title.indexOf(words[i]) >= 0) matched++
-            }
-            if (matched === words.length) return 50
-            if (matched > 0) return 30 + (matched / words.length) * 20
-        }
-        return 10
     }
 
     async findEpisodes(id) {
@@ -108,7 +117,7 @@ class Provider {
                     id: id + "|" + bestSid + "|" + epNum,
                     number: epNum,
                     url: this.base + "/index.php/vod/play/id/" + id + "/sid/" + bestSid + "/nid/" + epNum + ".html",
-                    title: "第" + epNum + "集"
+                    title: "\u7B2C" + epNum + "\u96C6"
                 })
             }
 
@@ -147,7 +156,7 @@ class Provider {
                     return {
                         server: server || "Auto",
                         headers: { "Referer": this.base + "/", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-                        videoSources: [{ url: m3[0], type: "m3u8", quality: "auto" }]
+                        videoSources: [{ url: m3[0], type: "m3u8", quality: "auto", subtitles: [] }]
                     }
                 }
                 return { server: "Auto", headers: {}, videoSources: [] }
@@ -185,7 +194,7 @@ class Provider {
             return {
                 server: server || "Auto",
                 headers: { "Referer": this.base + "/", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-                videoSources: [{ url: videoUrl, type: "m3u8", quality: "auto" }]
+                videoSources: [{ url: videoUrl, type: "m3u8", quality: "auto", subtitles: [] }]
             }
         } catch (e) {
             console.error("[Jibi] findEpisodeServer error:", e)

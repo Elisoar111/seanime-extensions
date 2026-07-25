@@ -1,26 +1,29 @@
 # seanime-extensions
 
-
 > **English | [中文](./README.md)**
 
-**Seanime Extensions** — Manga sources, anime torrent providers, and plugins for [Seanime](https://seanime.app).
+**Seanime Extensions** — Online streaming providers, anime torrent providers, manga sources, and plugins for [Seanime](https://seanime.app).
 
 ---
 
-##  Extensions
+## Extensions
 
 | Extension | Type | Version | Description |
 |-----------|------|---------|-------------|
 | **[Bangumi](./Bangumi)** | Plugin | v1.1.3 | View full Bangumi metadata in the Seanime sidebar with collection management |
-| **[AniBT](./anibt)** | Anime Torrent Provider | v1.0.0 | Search anime torrent magnet links via AniBT, supports streaming |
-| **[Anime Garden](./Anime-Garden)** | Anime Torrent Provider | v1.0.1 | Real-time, accurate Chinese-subtitled anime torrents |
-| **[Mikan Project](./mikan-project)** | Anime Torrent Provider | v1.1.0 | Search anime torrents via Mikan Project RSS |
-| **[60ti Manga](./60ti)** | Manga Provider | v1.0.1 | Chinese manga source from 60ti |
-| **[Baozi Manga (baozimh)](./baozimh)** | Manga Provider | v1.0.0 | Chinese manga source from Baozi |
+| **[AniBT](./anibt)** | Anime Torrent | v1.3.0 | Search anime torrent magnet links via AniBT |
+| **[Anime Garden](./Anime-Garden)** | Anime Torrent | v1.0.1 | Real-time, accurate Chinese-subtitled anime torrents |
+| **[Mikan Project](./mikan-project)** | Anime Torrent | v1.1.0 | Search anime torrents via Mikan Project RSS |
+| **[60ti Manga](./60ti)** | Manga | v1.0.1 | Chinese manga source from 60ti |
+| **[Baozi Manga (baozimh)](./baozimh)** | Manga | v1.0.0 | Chinese manga source from Baozi |
+| **[VTT6](./vtt6)** | Online Stream | v1.0.0 | Online anime streaming from VTT6 |
+| **[Jibi](./jibi.cc)** | Online Stream | v1.0.0 | Online anime streaming from Jibi.cc |
+| **[FQDM (Tomato Anime)](./fqdm)** | Online Stream | v1.0.0 | Online anime streaming with 5 server auto-select |
+| **[DMLAC (Windmill Anime)](./dmlac)** | Online Stream | v1.0.0 | Online anime streaming from DMLAC |
 
 ---
 
-##  Installation
+## Installation
 
 In Seanime → **Extensions** → Click **+** at the top right → **Install from URL**, then paste the manifest URL:
 
@@ -42,13 +45,25 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/manife
 
 # Baozi Manga
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/manifest.json
+
+# VTT6
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/vtt6/manifest.json
+
+# Jibi
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/jibi.cc/manifest.json
+
+# FQDM (Tomato Anime)
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/fqdm/manifest.json
+
+# DMLAC (Windmill Anime)
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/manifest.json
 ```
 
 You can also manually download `manifest.json` and `provider.js` from the extension directory and place them in Seanime's `extensions/` folder, then click **Reload**.
 
 ---
 
-##  Details
+## Details
 
 ### Bangumi
 
@@ -96,8 +111,38 @@ Chinese manga source from Baozi.
 
 - Configurable site address, default `https://cn.bzmanga.com`
 
+### VTT6
+
+Online anime streaming from VTT6, supports Chinese search only.
+
+- 4 streaming servers (HD / ikun / Extraordinary / Quantum)
+- m3u8 HLS streaming
+
+### Jibi
+
+Online anime streaming from Jibi.cc, based on Apple CMS.
+
+- Automatically adapts to available streaming sources per anime
+- Multi-server auto-select best source
+- m3u8 HLS streaming
+
+### FQDM (Tomato Anime)
+
+Online anime streaming from Tomato Anime (fqdm.cc), with 5 servers and auto best-match.
+
+- 5 servers (Sina Resource 2 / Tomato Line 2 / Tomato Line 1 / Fast Stream 1 / Endless ③)
+- Automatically selects the server with the most episodes
+- m3u8 HLS streaming
+
+### DMLAC (Windmill Anime)
+
+Online anime streaming from Windmill Anime (dmlac.com).
+
+- Clean interface with direct playback
+- m3u8 HLS streaming
+
 ---
 
-##  License
+## License
 
 [MIT](LICENSE) © Elisoar

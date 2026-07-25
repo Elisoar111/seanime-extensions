@@ -3,7 +3,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/Elisoar111/seanime-extensions)](https://github.com/Elisoar111/seanime-extensions/stargazers)
 [![License](https://img.shields.io/github/license/Elisoar111/seanime-extensions)](LICENSE)
 
-**Seanime Extensions** — 为 [Seanime](https://seanime.app) 提供漫画源、动画种子源和功能插件。
+**Seanime Extensions Collection** — 为 [Seanime](https://seanime.app) 提供漫画源、动画种子源和功能插件。
 
 ---
 

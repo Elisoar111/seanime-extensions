@@ -1,0 +1,14 @@
+{
+  "id": "vtt6",
+  "name": "VTT6",
+  "description": "VTT6 is an online streaming provider for subbed anime and donghua in chinese. Supports Chinese search only.",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "onlinestream-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "website": "https://www.vtt6.com",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/vtt6/icon.png",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/vtt6/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/vtt6/manifest.json"
+}

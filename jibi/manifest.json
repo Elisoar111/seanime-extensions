@@ -1,0 +1,14 @@
+{
+  "id": "jibi",
+  "name": "Jibi",
+  "description": "叽哔动漫在线观看 — Jibi.cc 在线动漫播放插件。支持搜索、多播放线路、m3u8 流式播放。每个动画自动适配可用播放源数量。",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "onlinestream-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/jibi/icon.png",
+  "website": "https://www.jibi.cc",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/jibi/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/jibi/manifest.json"
+}

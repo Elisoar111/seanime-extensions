@@ -1,7 +1,7 @@
 {
   "id": "anibt",
   "name": "AniBT",
-  "description": ""description": "Anime torrent search via AniBT. Supports Chinese/English/Japanese title search, Bangumi ID lookup",
+  "description": "Anime torrent search via AniBT. Supports Chinese/English/Japanese title search, Bangumi ID lookup",
   "version": "1.0.0",
   "author": "Elisoar",
   "type": "anime-torrent-provider",

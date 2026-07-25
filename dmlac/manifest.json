@@ -1,0 +1,14 @@
+{
+  "id": "dmlac",
+  "name": "DMLAC (\\u98CE\\u8F66\\u52A8\\u6F2B)",
+  "description": "\\u98CE\\u8F66\\u52A8\\u6F2B\\u5728\\u7EBF\\u89C2\\u770B \\u2014 DMLAC.com \\u5728\\u7EBF\\u52A8\\u6F2B\\u64AD\\u653E\\u63D2\\u4EF6\\u3002\\u652F\\u6301\\u641C\\u7D22\\u3001m3u8 \\u6D41\\u5F0F\\u64AD\\u653E\\u3002",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "onlinestream-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/icon.png",
+  "website": "https://www.dmlac.com",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/manifest.json"
+}

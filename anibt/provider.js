@@ -1,25 +1,3 @@
-/**
- * AniBT (番组字幕发布) — Torrent Provider for Seanime
- *
- * Fetches anime torrent releases from https://anibt.net
- * Uses the public AniBT API to search by Bangumi ID and retrieve group releases.
- *
- * API Endpoints:
- *   GET /api/seasons/anime        — 本季动画列表 (for getLatest)
- *   GET /api/bgm/search?q=&limit= — 按标题搜索 Bangumi ID
- *   GET /api/anime/groups?bgmId= — 获取指定条目的字幕组发布
- *
- * Build: 编辑此文件后运行 `node build.js` 重新生成 manifest.json
- *
- * @version 1.3.0
- *
- * $habari API (per official Seanime AnimeTosho reference):
- *   episode_number  → string[] (array of episode numbers)
- *   video_resolution → string  (e.g. "1080p")
- *   release_group   → string  (fansub group name)
- *   title           → string  (cleaned title)
- */
-
 class Provider {
 
     constructor() {

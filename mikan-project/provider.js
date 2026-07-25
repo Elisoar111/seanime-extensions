@@ -3,7 +3,7 @@
 
 class Provider {
     constructor() {
-        this.baseUrl = "https://mikanime.tv";
+        this.baseUrl = $getUserPreference("baseUrl") || "https://mikanani.kas.pub";
         this.searchEndpoint = "/RSS/Search?searchstr=";
         this.latestEndpoint = "/RSS/Classic";
 

@@ -3,7 +3,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/Elisoar111/seanime-extensions)](https://github.com/Elisoar111/seanime-extensions/stargazers)
 [![License](https://img.shields.io/github/license/Elisoar111/seanime-extensions)](LICENSE)
 
-> **English | [中文](./README.md)**
+> **[English](./README_EN.md) | [中文](./README.md)**
 
 **Seanime Extensions Collection** — Manga sources, anime torrent providers, and plugins for [Seanime](https://seanime.app).
 

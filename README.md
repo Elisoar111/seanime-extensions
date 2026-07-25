@@ -1,36 +1,35 @@
 # seanime-extensions
 
 [![GitHub stars](https://img.shields.io/github/stars/Elisoar111/seanime-extensions)](https://github.com/Elisoar111/seanime-extensions/stargazers)
-[![JavaScript](https://img.shields.io/badge/JavaScript-56.7%25-yellow)](https://github.com/Elisoar111/seanime-extensions/search?l=javascript)
-[![TypeScript](https://img.shields.io/badge/TypeScript-43.3%25-blue)](https://github.com/Elisoar111/seanime-extensions/search?l=typescript)
+[![License](https://img.shields.io/github/license/Elisoar111/seanime-extensions)](LICENSE)
 
-**Seanime Extensions Collection** —— 提供漫画源、动画种子源和功能插件，为 [Seanime](https://seanime.app) 扩展功能。
+**Seanime Extensions Collection** — 为 [Seanime](https://seanime.app) 提供漫画源、动画种子源和功能插件。
 
 ---
 
-##  Extension List
+##  Extensions
 
-| Extension | Type | Description |
-|-----------|------|-------------|
-| **[Bangumi 番组计划](./Bangumi)** | Plugin | View complete metadata from **Bangumi** in Seanime sidebar, including ratings, characters, episodes, related entries, and collection management |
-| **[Anime Garden](./Anime-Garden)** | Anime Torrent Provider | Provide real-time, accurate Chinese subtitles anime torrents |
-| **[Mikan Project](./mikan-project)** | Anime Torrent Provider | Mikan Project — real-time, accurate Chinese subtitles anime torrents |
-| **[60ti 漫画](./60ti)** | Manga Provider | Chinese manga source from 60ti |
-| **[Baozi Manga (baozimh)](./baozimh)** | Manga Provider | Chinese manga source from Baozi |
+| Extension | Type | Version | Description |
+|-----------|------|---------|-------------|
+| **[Bangumi 番组计划](./Bangumi)** | Plugin | v1.1.3 | 在 Seanime 侧栏展示 Bangumi 完整元数据，支持收藏管理 |
+| **[AniBT](./anibt)** | Anime Torrent Provider | v1.0.0 | 通过 AniBT 搜索番剧磁力链接，支持流式播放 |
+| **[Anime Garden](./Anime-Garden)** | Anime Torrent Provider | v1.0.1 | 实时准确的动漫字幕种子搜索 |
+| **[Mikan Project](./mikan-project)** | Anime Torrent Provider | v1.1.0 | 通过蜜柑计划 RSS 订阅搜索番剧种子 |
+| **[60ti 漫画](./60ti)** | Manga Provider | v1.0.1 | 60ti 中文漫画源 |
+| **[Baozi Manga (baozimh)](./baozimh)** | Manga Provider | v1.0.0 | 包子漫画中文漫画源 |
 
 ---
 
 ##  Installation
 
-### Method 1: Install from GitHub (Recommended)
-
-1. Open Seanime → **Extensions**
-2. Click the **+** button at the top right → **Install from URL**
-3. Paste the `manifest` link for the extension:
+在 Seanime → **Extensions** → 右上角 **+** → **Install from URL**，粘贴对应扩展的 manifest 地址：
 
 ```bash
 # Bangumi
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/manifest.json
+
+# AniBT
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/manifest.json
 
 # Anime Garden
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Anime-Garden/manifest.json
@@ -45,105 +44,60 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/manife
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/baozimh/manifest.json
 ```
 
----
-
-### Method 2: Manual Installation
-
-1. Download the `manifest.json` and `provider.js`/`provider.ts` files from the extension directory
-2. Place them in Seanime's `extensions/` folder
-3. Open Seanime → **Extensions** → Click **Reload**
+也可手动下载对应目录的 `manifest.json` + `provider.js` 放入 Seanime `extensions/` 目录后重载。
 
 ---
 
-##  Extension Details
+##  Details
 
-### Bangumi 番组计划（Bangumi）
+### Bangumi 番组计划
 
-This extension allows you to view **complete metadata** from **Bangumi** in the Seanime sidebar. It integrates with **AniList** and supports **rating systems**, **character lists**, **episode lists**, and **collection management**.
+在 Seanime 侧栏查看 Bangumi 番组计划的完整元数据，支持收藏管理与观看进度同步。
 
-#### Features:
+- **自动匹配** — 日文优先，多标题候选 + 年份加权
+- **评分系统** — Bangumi 评分 + Rank + 分布图，与 AniList 评分对比
+- **完整信息** — 中/日文标题、播出日期、话数、平台、标签、简介、Infobox
+- **角色列表** — 最多 2 名声优，点击图片放大
+- **章节列表** — 完整章节表格，自动计算下一集播出时间
+- **关联条目** — 续集/前传/衍生作品卡片，支持跳转绑定
+- **收藏管理** — 想看/看过/在看/搁置/抛弃，+/- 观看进度（需 Access Token）
+- **故障转移** — 多端点自动切换，429 退避重试，镜像自动追加
+- **本地缓存** — 3 天缓存减少重复请求
 
-- **Auto Match** — Japanese-first search, multiple title candidates + year-based priority
-- **Rating System** — Bangumi score + ranking + distribution graph, can be compared with AniList ratings
-- **Full Information** — Chinese/Japanese title, broadcast date, episode count, platforms, tags, synopsis, info panel
-- **Character List** — Up to 2 voice actors, image click to enlarge
-- **Episode List** — Full episode table, automatically calculate next episode airing time
-- **Related Entries** — Cards for sequel/prequel/parallel series, supports navigation
-- **Collection Management** — Set status as "Want to Watch", "Watching", "Watched", "On Hold", or "Dropped", with ± episode progress (requires Access Token)
-- **Token Validation** — UI prompt when token is invalid or expired
-- **Fault Tolerance** — Auto-switch between endpoints, 429 retry delay, mirror auto-adding
-- **Local Cache** — 3-day cache to reduce repeated requests
+### AniBT
 
-#### Configuration:
+通过 AniBT 公开 API 搜索番剧磁力链接，无需 API Key。
 
-| Configuration Item | Description |
-|--------------------|-------------|
-| **Access Token** | Bangumi personal token (optional), required for collection management. Create at: [https://next.bgm.tv/demo/access-token](https://next.bgm.tv/demo/access-token) |
-| **API Endpoint** | Default is `https://api.bgm.tv`, domestic users can add a mirror `https://api.bangumi.lol` |
-| **Auto Match** | Disable to manually search or bind by ID |
-| **Load Characters/Episodes/Related** | Toggle data sections to reduce requests |
-
----
+- 中文 / 英文 / 日文 / Romaji 标题搜索
+- Bangumi ID 直查
+- 集数 / 分辨率 / Batch 智能过滤
 
 ### Anime Garden
 
-An **anime torrent provider** extension that uses the Anime Garden API to fetch real-time and accurate Chinese subtitles anime torrents.
+使用 Anime Garden 实时获取准确的动漫字幕种子。
 
-#### Configuration:
+- 可配置 API 端点，默认 `https://api.animes.garden`
 
-- Customizable API endpoint; default is `https://api.animes.garden`
-- Replace with a mirror if default endpoint is unavailable
+### Mikan Project
 
----
+通过蜜柑计划 RSS 搜索番剧种子，支持多镜像地址。
 
-### Mikan Project（Mikan Plan）
-
-An **anime torrent provider** extension that uses **Mikan Project** API to fetch real-time and accurate Chinese subtitles anime torrents.
-
-#### Configuration:
-
-- Customizable Mikan site domain; default is `https://mikanime.tv`
-- Replace with a mirror if the site is unreachable
-
----
+- 可配置站点域名，默认 `https://mikanani.kas.pub`
 
 ### 60ti 漫画
 
-A **manga provider** extension for **Chinese manga sources** from 60ti.
+60ti 中文漫画源。
 
-#### Configuration:
-
-- Customizable site address; default is `https://www.60ti.com`
-- Use a mirror if site is down
-
----
+- 可配置站点地址，默认 `https://www.60ti.com`
 
 ### Baozi Manga (baozimh)
 
-A **manga provider** extension for **Chinese manga sources** from Baozi.
+包子漫画中文漫画源。
 
-#### Configuration:
-
-- Customizable site address; default is `https://cn.bzmanga.com`
-- Use a mirror if site is down
+- 可配置站点地址，默认 `https://cn.bzmanga.com`
 
 ---
 
 ##  License
 
-MIT License
-
----
-
-##  Acknowledgements
-
-- **Seanime** — Powerful anime management desktop app ([https://seanime.app](https://seanime.app))
-- **Bangumi** — Comprehensive anime database
-- **Anime Garden** — Anime torrent seed aggregator
-- **Mikan Project** — Great anime torrent source
-
----
-
-##  Contributions
-
-We welcome **Issues** and **Pull Requests** from the community! Please feel free to contribute and help improve this project.
+[MIT](LICENSE) © Elisoar

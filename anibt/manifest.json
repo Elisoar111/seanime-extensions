@@ -7,6 +7,7 @@
   "type": "anime-torrent-provider",
   "language": "javascript",
   "lang": "zh",
+  "website":"https://anibt.net/",
   "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/icon.png",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/provider.js",
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/manifest.json",

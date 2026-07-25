@@ -5,7 +5,7 @@
 
 > **[English](./README_EN.md) | [中文](./README.md)**
 
-**Seanime Extensions Collection** — Manga sources, anime torrent providers, and plugins for [Seanime](https://seanime.app).
+**Seanime Extensions** — Manga sources, anime torrent providers, and plugins for [Seanime](https://seanime.app).
 
 ---
 
@@ -72,9 +72,7 @@ Search anime torrent magnet links via the AniBT public API. No API key required.
 
 - Chinese / English / Japanese / Romaji title search
 - Direct Bangumi ID lookup
-- Subtitle group results grouping
 - Episode / Resolution / Batch smart filters
-- Current season latest releases browsing
 
 ### Anime Garden
 

@@ -13,14 +13,5 @@
   "userConfig": {
     "requiresConfig": false,
     "version": 1,
-    "fields": [
-      {
-        "name": "apiUrl",
-        "label": "API 地址",
-        "type": "text",
-        "default": "https://anibt.net",
-        "description": "站点地址，一般不需要修改"
-      }
-    ]
   }
 }

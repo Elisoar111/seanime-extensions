@@ -181,6 +181,19 @@ class Provider {
     async _resolveBgmId(opts) {
         const queries = this._buildQueries(opts)
         if (!queries.length) return 0
+
+        // 如果搜索词是纯数字，直接作为 Bangumi ID 使用，跳过 API 搜索
+        for (const q of queries) {
+            const trimmed = q.trim()
+            if (/^\d+$/.test(trimmed)) {
+                const id = parseInt(trimmed, 10)
+                if (id > 0) {
+                    console.log("[AniBT] 直接使用 Bangumi ID:", id)
+                    return id
+                }
+            }
+        }
+
         for (const q of queries) {
             const id = await this._searchBgmId(q)
             if (id) return id

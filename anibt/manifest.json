@@ -1,18 +1,14 @@
 {
   "id": "anibt",
   "name": "AniBT",
-  "description": "AniBT 字幕组发布平台 — 通过公开 API 搜索番剧磁力链接，支持中文标题搜索、按集/分辨率过滤。自动提取本季度最新发布。",
+  "description": ""description": "Anime torrent search via AniBT. Supports Chinese/English/Japanese title search, Bangumi ID lookup",
   "version": "1.0.0",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "javascript",
   "lang": "zh",
-  "website":"https://anibt.net/",
+  "website": "https://anibt.net/",
   "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/icon.png",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/provider.js",
-  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/manifest.json",
-  "userConfig": {
-    "requiresConfig": false,
-    "version": 1,
-  }
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/anibt/manifest.json"
 }

@@ -1,8 +1,8 @@
 {
   "id": "anibt",
-  "name": "AniBT (番组字幕发布)",
+  "name": "AniBT",
   "description": "AniBT 字幕组发布平台 — 通过公开 API 搜索番剧磁力链接，支持中文标题搜索、按集/分辨率过滤。自动提取本季度最新发布。",
-  "version": "1.3.1",
+  "version": "1.0.0",
   "author": "Elisoar",
   "type": "anime-torrent-provider",
   "language": "javascript",

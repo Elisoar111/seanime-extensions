@@ -1,7 +1,7 @@
 {
   "id": "dmlac",
   "name": "DMLAC",
-  "description": "无",
+  "description": "DMLAC is an online streaming provider for subbed anime and donghua in Chinese. Supports Chinese search only.",
   "version": "1.0.0",
   "author": "Elisoar",
   "type": "onlinestream-provider",

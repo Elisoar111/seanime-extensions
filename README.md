@@ -57,6 +57,7 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/fqdm/manife
 
 # DMLAC - 风车动漫
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/manifest.json
+
 # FZDM - 风之动漫
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/manifest.json
 ```

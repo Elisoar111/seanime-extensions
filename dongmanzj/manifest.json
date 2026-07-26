@@ -1,0 +1,14 @@
+{
+  "id": "freezeframez",
+  "name": "FFZ (\\u98CE\\u4E4B\\u52A8\\u6F2B)",
+  "description": "风之动漫-最大最全的动漫网站",
+  "version": "1.0.0",
+  "author": "Elisoar",
+  "type": "onlinestream-provider",
+  "language": "javascript",
+  "lang": "zh",
+  "icon": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/icon.png",
+  "website": "https://www.freezeframez.com",
+  "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/provider.js",
+  "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/manifest.json"
+}

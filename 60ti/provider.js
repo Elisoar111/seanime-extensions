@@ -1,5 +1,4 @@
 /// <reference path="./manga-provider.d.ts" />
-/// <reference path="./core.d.ts" />
 
 class Provider {
     constructor() {

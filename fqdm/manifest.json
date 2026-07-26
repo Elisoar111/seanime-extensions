@@ -1,7 +1,7 @@
 {
   "id": "fqdm",
-  "name": "FQDM (番茄动漫)",
-  "description": "番茄动漫在线观看 — FQDM.cc 在线动漫播放插件。支持搜索、多播放线路、m3u8 流式播放。5条播放线路自动匹配最佳源。",
+  "name": "FQDM",
+  "description": "FQDM is an online streaming provider for subbed anime and donghua in Chinese.Supports Chinese search only.",
   "version": "1.0.0",
   "author": "Elisoar",
   "type": "onlinestream-provider",

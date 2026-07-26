@@ -57,6 +57,9 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/fqdm/manife
 
 # DMLAC (Windmill Anime)
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/manifest.json
+
+# FZDM - 风之动漫
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/manifest.json
 ```
 
 You can also manually download `manifest.json` and `provider.js` from the extension directory and place them in Seanime's `extensions/` folder, then click **Reload**.

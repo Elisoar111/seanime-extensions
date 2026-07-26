@@ -20,7 +20,7 @@
 | **[Jibi](./jibi.cc)** | Online Stream | v1.0.0 | 叽哔动漫在线播放 |
 | **[FQDM (番茄动漫)](./fqdm)** | Online Stream | v1.0.0 | 番茄动漫在线播放，5条线路自动最佳匹配 |
 | **[DMLAC (风车动漫)](./dmlac)** | Online Stream | v1.0.0 | 风车动漫在线播放 |
-
+| **[FZDM (风之动漫)](./dongmanzj)** | Online Stream | v1.0.0 | 风之动漫在线播放 |
 ---
 
 ## 安装方式
@@ -146,6 +146,13 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/m
 - 简洁界面，直接播放
 - m3u8 流式播放
 
+### DMLAC (风之动漫)
+
+风之动漫在线观看。
+
+- m3u8 流式播放
+
+- 自动选择集数最多的线路作为默认
 ---
 
 ## 许可

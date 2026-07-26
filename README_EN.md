@@ -20,7 +20,7 @@
 | **[Jibi](./jibi.cc)** | Online Stream | v1.0.0 | Online anime streaming from Jibi.cc |
 | **[FQDM (Tomato Anime)](./fqdm)** | Online Stream | v1.0.0 | Online anime streaming with 5 server auto-select |
 | **[DMLAC (Windmill Anime)](./dmlac)** | Online Stream | v1.0.0 | Online anime streaming from DMLAC |
-
+| **[FZDM (Wind Anime)](./dongmanzj)** | Online Stream | v1.0.0 | Online anime streaming from FZDM |
 ---
 
 ## Installation
@@ -143,6 +143,14 @@ Online anime streaming from Windmill Anime (dmlac.com).
 
 - Clean interface with direct playback
 - m3u8 HLS streaming
+
+### FZDM (Wind Anime)
+
+Online anime streaming from Windmill Anime (dmlac.com).
+
+- m3u8 HLS streaming
+
+-  Automatically selects the server with the most episodes
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "id": "jibi",
   "name": "Jibi",
-  "description": "叽哔动漫在线观看 — Jibi.cc 在线动漫播放插件。支持搜索、多播放线路、m3u8 流式播放。每个动画自动适配可用播放源数量。",
+  "description": "Jibi is an online streaming provider for subbed anime and donghua in Chinese. Supports multi-server auto-select.Supports Chinese search only.",
   "version": "1.0.0",
   "author": "Elisoar",
   "type": "onlinestream-provider",

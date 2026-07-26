@@ -57,6 +57,8 @@ https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/fqdm/manife
 
 # DMLAC - 风车动漫
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dmlac/manifest.json
+# FZDM - 风之动漫
+https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/dongmanzj/manifest.json
 ```
 
 也可手动下载对应目录的 `manifest.json` + `provider.js` 放入 Seanime `extensions/` 目录后重载。

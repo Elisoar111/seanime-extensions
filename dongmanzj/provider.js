@@ -1,3 +1,4 @@
+/// <reference path="./online-streaming-provider.d.ts" />
 class Provider {
     constructor() {
         this.base = "https://www.freezeframez.com"

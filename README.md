@@ -10,7 +10,7 @@
 
 | 扩展 | 类型 | 版本 | 说明 |
 |------|------|------|------|
-| **[Bangumi 番组计划](./Bangumi)** | Plugin | v1.1.3 | 在 Seanime 侧栏展示 Bangumi 完整元数据，支持收藏管理 |
+| **[Bangumi 番组计划](./Bangumi)** | Plugin | v1.2.0 | 在 Seanime 侧栏展示 Bangumi 完整元数据，支持收藏管理 |
 | **[AniBT](./anibt)** | Anime Torrent | v1.3.0 | 番组字幕发布平台磁力搜索 |
 | **[Anime Garden](./Anime-Garden)** | Anime Torrent | v1.0.1 | 实时准确的动漫字幕种子搜索 |
 | **[Mikan Project](./mikan-project)** | Anime Torrent | v1.1.0 | 通过蜜柑计划 RSS 搜索番剧种子 |

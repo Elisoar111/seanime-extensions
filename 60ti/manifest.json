@@ -2,7 +2,7 @@
   "id": "sixty-manga-provider",
   "name": "sixty_Manga",
   "description": "60ti is a manga provider for Chinese manga in Chinese.Supports Chinese search only.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Elisoar",
   "type": "manga-provider",
   "language": "javascript",

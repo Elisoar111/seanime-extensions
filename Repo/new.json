@@ -3,7 +3,7 @@
     {
       "id": "60ti",
       "name": "60ti-manga",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "60ti is a manga provider for Chinese manga in Chinese.Supports Chinese search only.",
       "author": "Elisoar",
       "type": "manga-provider",

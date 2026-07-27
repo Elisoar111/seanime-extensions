@@ -2,7 +2,7 @@
 /// <reference path="./plugin.d.ts" />
 function init() {
     $ui.register(function (ctx) {
-        console.log("[bangumi-ui] 插件已加载 v1.1.3");
+        console.log("[bangumi-ui] 插件已加载 v1.2.0");
         // =================================================================
         //  Constants
         // =================================================================
@@ -16,7 +16,7 @@ function init() {
             status: "idle", errorMsg: "", mediaId: 0, subjectId: 0,
             endpoint: "", bound: false, entry: null, subject: null,
             chars: null, rels: null, eps: null, collection: null,
-            searchResults: [], searching: false, hasToken: false, tokenInvalid: false
+            searchResults: [], searching: false, hasToken: false, tokenInvalid: false, subjectBlogs: null, subjectTopics: null, calendar: null
         };
         var mediaIdState = ctx.state(0);
         var vm = ctx.state(emptyVM);
@@ -356,7 +356,8 @@ function init() {
                 status: "loading", errorMsg: "", mediaId: id, subjectId: 0,
                 bound: false, subject: null, chars: null, rels: null, eps: null,
                 collection: null, searchResults: [], searching: false,
-                hasToken: !!pref("accessToken", ""), tokenInvalid: false
+                hasToken: !!pref("accessToken", ""), tokenInvalid: false,
+                subjectBlogs: null, subjectTopics: null
             });
             if (force)
                 cDel(id);
@@ -431,7 +432,7 @@ function init() {
                     titles: raw,
                     cover: ci.extraLarge || ci.large || ci.medium || "",
                     banner: en.media.bannerImage || "",
-                    score: en.media.averageScore || 0,
+                    score: en.media.averageScore || en.media.meanScore || 0,
                     year: year
                 };
             }, function () { return fallback; });
@@ -760,6 +761,7 @@ function init() {
         // =================================================================
         //  Webview screen page（通过左侧边栏 Bangumi 入口访问）
         // =================================================================
+        console.log("[bangumi-ui] creating webview...");
         var wv = ctx.newWebview({
             slot: "screen",
             fullWidth: true,
@@ -769,10 +771,15 @@ function init() {
                 icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/></svg>'
             }
         });
+        console.log("[bangumi-ui] webview created, setting up sync...");
         wv.channel.sync("vm", vm);
-        wv.onLoad(function () {
-            patchVm({});
-        });
+        console.log("[bangumi-ui] sync set, setting content...");
+        try {
+            wv.setContent(buildHTML);
+            console.log("[bangumi-ui] content set successfully, HTML length: " + buildHTML().length);
+        } catch (e) {
+            console.log("[bangumi-ui] setContent error: " + e.message);
+        }
         wv.channel.on("refresh", function () {
             var id = vm.get().mediaId;
             if (!id) {
@@ -849,146 +856,250 @@ function init() {
                 }
             }, function () { return ctx.toast.error("进度更新失败：无法连接 Bangumi"); });
         });
-        wv.channel.on("open-bgm", function (v) {
-            var sid = parseInt(String(v || ""), 10) || vm.get().subjectId;
-            if (!sid)
+        wv.channel.on("set-rate", function (v) {
+            var sid = vm.get().subjectId;
+            var rate = parseInt(String(v || ""), 10);
+            if (!sid || isNaN(rate) || rate < 0 || rate > 10) return;
+            if (!pref("accessToken", "")) {
+                ctx.toast.error("请先在插件设置中配置 Bangumi Access Token");
                 return;
-            try {
-                $app.openURL("https://bgm.tv/subject/" + sid);
             }
-            catch (_) {
-                ctx.toast.info("https://bgm.tv/subject/" + sid);
-            }
+            apiWrite("PATCH", "/v0/users/-/collections/" + sid, { rate: rate }).then(function (r) {
+                if (r && r.status && r.status >= 200 && r.status < 300) {
+                    ctx.toast.success("已评分 " + rate + " 分");
+                    loadCollection(sid, reqSeq);
+                } else if (r && r.status === 401) {
+                    patchVm({ tokenInvalid: true });
+                    ctx.toast.error("Token 无效或已过期");
+                } else {
+                    ctx.toast.error("评分失败 (HTTP " + (r ? r.status : "无响应") + ")");
+                }
+            }, function () { return ctx.toast.error("评分失败：无法连接 Bangumi"); });
         });
-        wv.setContent(buildHTML);
+        wv.channel.on("load-calendar", function () {
+            var seq = reqSeq;
+            var stale = function () { return seq !== reqSeq; };
+            apiGet("/calendar").then(function (r) {
+                if (stale()) return;
+                if (r && r.status === 200) {
+                    try { patchVm({ calendar: r.json() }); } catch (_) { patchVm({ calendar: false }); }
+                } else { patchVm({ calendar: false }); }
+            }, function () { if (!stale()) patchVm({ calendar: false }); });
+        });
+        wv.channel.on("load-subject-blog", function (sid) {
+            if (!sid) return;
+            var seq = reqSeq;
+            var stale = function () { return seq !== reqSeq; };
+            apiGet("/subject/" + sid + "?responseGroup=large").then(function (r) {
+                if (stale()) return;
+                if (r && r.status === 200) {
+                    try {
+                        var data = r.json();
+                        var blog = (data && Object.prototype.toString.call(data.blog) === '[object Array]') ? data.blog : false;
+                        var topic = (data && Object.prototype.toString.call(data.topic) === '[object Array]') ? data.topic : false;
+                        patchVm({ subjectBlogs: blog, subjectTopics: topic });
+                    } catch (_) { patchVm({ subjectBlogs: false }); }
+                } else {
+                    patchVm({ subjectBlogs: false });
+                }
+            }, function () { if (!stale()) patchVm({ subjectBlogs: false }); });
+        });
+        wv.channel.on("reload-blog", function () {
+            var sid = vm.get().subjectId;
+            if (!sid) return;
+            patchVm({ subjectBlogs: null, subjectTopics: null });
+            var seq = reqSeq;
+            var stale = function () { return seq !== reqSeq; };
+            apiGet("/subject/" + sid + "?responseGroup=large").then(function (r) {
+                if (stale()) return;
+                if (r && r.status === 200) {
+                    try {
+                        var data = r.json();
+                        var blog = (data && Object.prototype.toString.call(data.blog) === '[object Array]') ? data.blog : false;
+                        var topic = (data && Object.prototype.toString.call(data.topic) === '[object Array]') ? data.topic : false;
+                        patchVm({ subjectBlogs: blog, subjectTopics: topic });
+                    } catch (_) { patchVm({ subjectBlogs: false }); }
+                } else {
+                    patchVm({ subjectBlogs: false });
+                }
+            }, function () { if (!stale()) patchVm({ subjectBlogs: false }); });
+        });
         // =================================================================
         //  Webview HTML
         // =================================================================
         function buildHTML() {
+            console.log("[bangumi-ui] buildHTML called");
             return "<!DOCTYPE html>\n" +
                 "<html lang=\"zh\">\n" +
                 "<head>\n" +
                 "<meta charset=\"UTF-8\">\n" +
                 "<style>\n" +
-                "html{color-scheme:dark;}\n" +
+                "html{color-scheme:dark;scroll-behavior:smooth;}\n" +
                 "*{box-sizing:border-box;}\n" +
-                "body{background:transparent;color:#e2e8f0;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;margin:0;padding:24px;font-size:14px;line-height:1.6;}\n" +
+                "body{background:transparent;color:#e2e8f0;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;margin:0;padding:24px;font-size:14px;line-height:1.7;}\n" +
                 "a{color:#8b5cf6;text-decoration:none;}\n" +
                 ".wrap{max-width:1080px;margin:0 auto;}\n" +
-                ".fade{animation:fadein .25s ease;}\n" +
-                "@keyframes fadein{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}\n" +
-                ".topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;}\n" +
-                ".brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.3px;}\n" +
-                ".brand .dot{width:10px;height:10px;border-radius:50%;background:#f09199;box-shadow:0 0 12px rgba(240,145,153,.6);}\n" +
-                ".chips{display:flex;gap:8px;flex-wrap:wrap;}\n" +
+                ".fade{animation:fadeUp .35s ease both;}\n" +
+                "@keyframes fadeUp{0%{opacity:0;transform:translateY(14px);}100%{opacity:1;transform:translateY(0);}}\n" +
+                ".chips{display:flex;gap:6px;flex-wrap:wrap;}\n" +
                 ".chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;background:#1e293b;color:#94a3b8;border:1px solid #334155;}\n" +
                 ".chip.pink{background:rgba(240,145,153,.12);color:#f09199;border-color:rgba(240,145,153,.35);}\n" +
                 ".chip.green{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.35);}\n" +
                 ".chip.gold{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.35);}\n" +
-                ".chip.nsfw{background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.4);font-size:11px;}\n" +
-                ".btn{padding:7px 14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;cursor:pointer;transition:.15s;font-family:inherit;}\n" +
-                ".btn:hover{background:#334155;transform:translateY(-1px);}\n" +
-                ".btn.primary{background:#6366f1;border-color:#6366f1;}\n" +
-                ".btn.primary:hover{background:#4f46e5;}\n" +
-                ".btn.danger:hover{background:#7f1d1d;border-color:#ef4444;}\n" +
-                ".btn.ghost{background:transparent;}\n" +
-                ".btnrow{display:flex;gap:8px;flex-wrap:wrap;}\n" +
-                ".card{background:#10161f;border:1px solid #1e293b;border-radius:14px;padding:20px;}\n" +
-                ".hero{position:relative;overflow:hidden;border:1px solid #1e293b;border-radius:16px;margin-bottom:20px;background:#0d131c;}\n" +
-                ".hero-bg{position:absolute;inset:-24px;background-size:cover;background-position:center 25%;filter:blur(30px) brightness(.42) saturate(1.25);transform:scale(1.12);}\n" +
-                ".hero-fade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,13,20,.15) 0%,rgba(9,13,20,.78) 65%,rgba(9,13,20,.95) 100%);}\n" +
-                ".hero-in{position:relative;display:flex;gap:22px;padding:26px;align-items:flex-end;min-height:210px;}\n" +
-                ".hero-cover{width:168px;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:#1e293b;box-shadow:0 10px 34px rgba(0,0,0,.55);flex-shrink:0;cursor:zoom-in;}\n" +
-                ".hero-txt{min-width:0;padding-bottom:4px;}\n" +
-                ".hero-txt h1{font-size:26px;margin:0 0 6px;line-height:1.3;text-shadow:0 2px 12px rgba(0,0,0,.6);}\n" +
+                ".btn{padding:7px 14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit;}\n" +
+                ".btn:hover{background:#334155;transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.35);}\n" +
+                ".btn.primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;}\n" +
+                ".btn.primary:hover{background:linear-gradient(135deg,#4f46e5,#7c3aed);box-shadow:0 4px 18px rgba(99,102,241,.4);}\n" +
+                ".btn.danger{color:#f87171;}\n" +
+                ".btn.danger:hover{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444;}\n" +
+                ".btn.ghost{background:transparent;border-color:transparent;}\n" +
+                ".btn.ghost:hover{background:rgba(148,163,184,.08);}\n" +
+                ".btn.small{padding:4px 10px;font-size:11px;}\n" +
+                ".topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(16,22,31,.65);backdrop-filter:blur(14px);border:1px solid #1e293b;border-radius:14px;padding:12px 18px;margin-bottom:18px;}\n" +
+                ".topbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}\n" +
+                ".topbar-right{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}\n" +
+                ".topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;flex-shrink:0;}\n" +
+                ".topbar .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#f09199,#8b5cf6);flex-shrink:0;}\n" +
+                ".topbar .btn{font-size:12px;padding:5px 10px;}\n" +
+                ".badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;line-height:1.5;}\n" +
+                ".badge-id{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.35);cursor:pointer;}\n" +
+                ".badge-id:hover{background:rgba(16,185,129,.25);border-color:rgba(16,185,129,.55);}\n" +
+                ".badge-brand{background:rgba(240,145,153,.15);color:#f09199;border:1px solid rgba(240,145,153,.35);}\n" +
+                ".badge-bound{background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.35);}\n" +
+                ".badge-bound:hover{background:rgba(96,165,250,.25);border-color:rgba(96,165,250,.55);}\n" +
+                ".badge-ep{background:rgba(240,145,153,.12);color:#f09199;border:1px solid rgba(240,145,153,.35);}\n" +
+                ".card{background:rgba(16,22,31,.78);backdrop-filter:blur(10px);border:1px solid #1e293b;border-radius:16px;padding:22px;transition:border-color .25s,box-shadow .25s;}\n" +
+                ".card:hover{border-color:#2d3a52;box-shadow:0 4px 20px rgba(0,0,0,.2);}\n" +
+                ".hero{position:relative;overflow:hidden;border-radius:18px;margin-bottom:22px;background:#0d131c;border:1px solid #1e293b;}\n" +
+                ".hero-bg{position:absolute;inset:-24px;background-size:cover;background-position:center 25%;filter:blur(35px) brightness(.32) saturate(1.35);transform:scale(1.15);}\n" +
+                ".hero-fade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(9,13,20,.08) 0%,rgba(9,13,20,.65) 50%,rgba(9,13,20,.92) 100%);}\n" +
+                ".hero-in{position:relative;display:flex;gap:24px;padding:28px;align-items:flex-end;min-height:220px;}\n" +
+                ".hero-cover{width:170px;aspect-ratio:3/4;object-fit:cover;border-radius:14px;background:#1e293b;box-shadow:0 12px 44px rgba(0,0,0,.55);flex-shrink:0;cursor:zoom-in;transition:transform .3s;}\n" +
+                ".hero-cover:hover{transform:scale(1.04);}\n" +
+                ".hero-txt{min-width:0;padding-bottom:6px;}\n" +
+                ".hero-txt h1{font-size:28px;margin:0 0 8px;line-height:1.3;text-shadow:0 2px 20px rgba(0,0,0,.6);}\n" +
                 ".hero-jp{font-size:15px;color:#c3cbd8;font-weight:500;}\n" +
-                ".hero-al{font-size:12px;color:#8b96a8;margin-top:3px;}\n" +
-                ".nextep{display:inline-block;margin-top:10px;padding:3px 12px;border-radius:999px;font-size:12px;background:rgba(99,102,241,.16);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);}\n" +
-                "@media(max-width:680px){.hero-in{flex-direction:column;align-items:flex-start;min-height:0;}.hero-cover{width:120px;}}\n" +
-                ".grid{display:grid;grid-template-columns:260px 1fr;gap:24px;}\n" +
+                ".hero-al{font-size:12px;color:#8b96a8;margin-top:4px;}\n" +
+                ".nextep{display:inline-block;margin-top:12px;padding:5px 16px;border-radius:999px;font-size:12px;background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(139,92,246,.22));color:#a5b4fc;border:1px solid rgba(99,102,241,.4);}\n" +
+                "@media(max-width:680px){.hero-in{flex-direction:column;align-items:flex-start;min-height:0;padding:20px;}.hero-cover{width:120px;}.hero-txt h1{font-size:22px;}}\n" +
+                "@media(max-width:480px){.topbar{flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;}.topbar-left{justify-content:center;}.topbar-right{margin-left:0;justify-content:center;}.topbar .btn{padding:4px 8px;font-size:11px;}.card{padding:16px;}}\n" +
+                ".grid{display:grid;grid-template-columns:280px 1fr;gap:24px;}\n" +
                 "@media(max-width:760px){.grid{grid-template-columns:1fr;}}\n" +
-                ".scorebox{padding:16px;background:#0b0f16;border-radius:12px;border:1px solid #1e293b;}\n" +
-                ".scorerow{display:flex;align-items:center;gap:16px;justify-content:center;}\n" +
-                ".score-num{font-size:42px;font-weight:800;line-height:1.05;}\n" +
-                ".score-max{font-size:14px;color:#64748b;font-weight:500;}\n" +
-                ".scoresub{display:flex;flex-direction:column;align-items:flex-start;}\n" +
+                ".scorebox{padding:22px;background:rgba(11,15,22,.75);border-radius:16px;border:1px solid #1e293b;text-align:center;}\n" +
                 ".muted{color:#94a3b8;}\n" +
                 ".small{font-size:12px;}\n" +
-                "h3{font-size:15px;margin:22px 0 10px;padding-left:10px;border-left:3px solid #f09199;}\n" +
-                ".meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin:4px 0 14px;}\n" +
+                "h3{font-size:15px;margin:24px 0 12px;padding-left:12px;border-left:3px solid #f09199;font-weight:600;}\n" +
+                ".meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 16px;margin:4px 0 16px;}\n" +
                 ".meta .k{font-size:12px;color:#64748b;}\n" +
-                ".meta .v{font-weight:600;}\n" +
-                ".tagrow{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;}\n" +
-                ".summary{color:#cbd5e1;white-space:pre-wrap;}\n" +
+                ".meta .v{font-weight:600;color:#e2e8f0;}\n" +
+                ".tagrow{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;}\n" +
+                ".summary{color:#cbd5e1;white-space:pre-wrap;line-height:1.75;}\n" +
                 ".dist-row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11px;}\n" +
-                ".dist-row .n{width:14px;text-align:right;color:#64748b;}\n" +
-                ".dist-bar{height:8px;border-radius:4px;background:linear-gradient(90deg,#f09199,#f43f5e);min-width:2px;transition:width .4s ease;}\n" +
-                ".dist-row .c{width:36px;color:#64748b;}\n" +
-                ".tabs{display:flex;gap:4px;border-bottom:1px solid #1e293b;margin-top:24px;position:sticky;top:0;background:rgba(9,13,20,.82);backdrop-filter:blur(10px);z-index:20;border-radius:10px 10px 0 0;}\n" +
-                ".tab{padding:10px 18px;cursor:pointer;border:none;background:none;color:#94a3b8;font-size:14px;border-bottom:2px solid transparent;font-family:inherit;transition:.15s;}\n" +
-                ".tab:hover{color:#e2e8f0;}\n" +
-                ".tab.active{color:#f09199;border-bottom-color:#f09199;font-weight:600;}\n" +
-                ".cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;margin-top:14px;}\n" +
-                ".citem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;overflow:hidden;text-align:center;cursor:zoom-in;transition:transform .15s,border-color .15s;}\n" +
-                ".citem:hover{transform:translateY(-3px);border-color:rgba(240,145,153,.4);}\n" +
+                ".dist-row .n{width:14px;text-align:right;color:#64748b;font-weight:600;}\n" +
+                ".dist-bar{height:8px;border-radius:4px;background:linear-gradient(90deg,#f09199,#f43f5e);min-width:2px;transition:width .5s;}\n" +
+                ".dist-row .c{width:36px;color:#64748b;text-align:right;}\n" +
+                ".tabs{display:flex;gap:2px;border-bottom:1px solid #1e293b;margin-top:28px;position:sticky;top:0;background:rgba(9,13,20,.88);backdrop-filter:blur(16px);z-index:20;border-radius:14px 14px 0 0;padding:0 6px;}\n" +
+                ".tab{padding:12px 22px;cursor:pointer;border:none;background:none;color:#64748b;font-size:14px;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;position:relative;}\n" +
+                ".tab:hover{color:#e2e8f0;background:rgba(148,163,184,.06);}\n" +
+                ".tab.active{color:#f09199;font-weight:600;}\n" +
+                ".tab.active::after{content:'';position:absolute;bottom:-1px;left:22%;right:22%;height:2px;background:linear-gradient(90deg,#f09199,#8b5cf6);border-radius:2px;}\n" +
+                ".tab-content{animation:fadeUp .3s ease both;}\n" +
+                ".cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:16px;}\n" +
+                ".citem{background:rgba(11,15,22,.75);border:1px solid #1e293b;border-radius:14px;overflow:hidden;text-align:center;cursor:zoom-in;transition:all .25s;}\n" +
+                ".citem:hover{transform:translateY(-4px);border-color:rgba(240,145,153,.4);box-shadow:0 10px 28px rgba(0,0,0,.35);}\n" +
                 ".cimg{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:#1e293b;}\n" +
-                ".cname{padding:6px 6px 2px;font-size:12px;font-weight:600;line-height:1.3;}\n" +
-                ".crel{padding:0 6px 6px;font-size:11px;color:#f09199;}\n" +
-                ".ccv{padding:0 6px 8px;font-size:11px;color:#64748b;}\n" +
-                ".eptable{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}\n" +
-                ".eptable td{padding:7px 10px;border-bottom:1px solid #1e293b;}\n" +
-                ".eptable tr:nth-child(even) td{background:rgba(148,163,184,.03);}\n" +
-                ".eptable tr:hover td{background:#141b26;}\n" +
-                ".epnum{width:50px;color:#f09199;font-weight:700;}\n" +
+                ".cname{padding:10px 8px 4px;font-size:12px;font-weight:600;line-height:1.3;}\n" +
+                ".crel{padding:0 8px 6px;font-size:11px;color:#f09199;}\n" +
+                ".ccv{padding:0 8px 12px;font-size:11px;color:#64748b;}\n" +
+                ".eptable{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px;font-size:13px;}\n" +
+                ".eptable td{padding:10px 14px;border-bottom:1px solid #1a2436;}\n" +
+                ".eptable tr:first-child td{border-top:1px solid #1a2436;}\n" +
+                ".eptable tr:nth-child(even) td{background:rgba(148,163,184,.025);}\n" +
+                ".eptable tr:hover td{background:rgba(99,102,241,.07);}\n" +
+                ".epseen td{color:#34d399!important;}\n" +
+                ".epnum{width:50px;color:#f09199;font-weight:700;text-align:center;}\n" +
                 ".epdate{width:110px;color:#64748b;font-size:12px;text-align:right;}\n" +
-                ".relgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:14px;}\n" +
-                ".relitem{background:#0b0f16;border:1px solid #1e293b;border-radius:10px;padding:10px;transition:border-color .15s;}\n" +
-                ".relitem:hover{border-color:rgba(240,145,153,.35);}\n" +
-                ".relname{font-size:13px;font-weight:600;line-height:1.35;margin-top:4px;}\n" +
-                ".reltype{font-size:11px;color:#f09199;}\n" +
-                ".relbtns{display:flex;gap:6px;margin-top:8px;}\n" +
+                ".relgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-top:16px;}\n" +
+                ".relitem{background:rgba(11,15,22,.75);border:1px solid #1e293b;border-radius:14px;padding:14px;transition:all .25s;}\n" +
+                ".relitem:hover{border-color:rgba(240,145,153,.35);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.25);}\n" +
+                ".relname{font-size:13px;font-weight:600;line-height:1.35;margin-top:6px;}\n" +
+                ".reltype{font-size:11px;color:#f09199;font-weight:500;margin-bottom:2px;}\n" +
+                ".relbtns{display:flex;gap:6px;margin-top:10px;}\n" +
                 ".center{text-align:center;padding:60px 20px;}\n" +
-                ".spinner{width:36px;height:36px;border:3px solid #1e293b;border-top-color:#f09199;border-radius:50%;margin:0 auto 16px;animation:spin 1s linear infinite;}\n" +
+                ".spinner{width:36px;height:36px;border:3px solid #1e293b;border-top-color:#f09199;border-radius:50%;margin:0 auto 16px;animation:spin .7s linear infinite;}\n" +
                 "@keyframes spin{to{transform:rotate(360deg);}}\n" +
-                ".panel{margin-top:20px;border:1px dashed #334155;border-radius:12px;padding:16px;background:#0b0f16;}\n" +
-                ".input{flex:1;min-width:180px;padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#10161f;color:#e2e8f0;font-size:13px;font-family:inherit;}\n" +
-                ".input:focus{outline:none;border-color:#6366f1;}\n" +
+                ".panel{border:1px dashed #334155;border-radius:14px;padding:18px;background:rgba(11,15,22,.55);}\n" +
+                ".input{flex:1;min-width:180px;padding:9px 14px;border-radius:10px;border:1px solid #334155;background:#10161f;color:#e2e8f0;font-size:13px;font-family:inherit;transition:border-color .25s;}\n" +
+                ".input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15);}\n" +
                 ".srow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}\n" +
-                ".sresult{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #1e293b;border-radius:8px;margin-top:6px;background:#10161f;}\n" +
+                ".sresult{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #1e293b;border-radius:12px;margin-top:8px;background:rgba(16,22,31,.5);transition:border-color .25s;}\n" +
                 ".sresult:hover{border-color:#f09199;}\n" +
-                ".sthumb{width:40px;height:54px;object-fit:cover;border-radius:6px;background:#1e293b;flex-shrink:0;}\n" +
+                ".sthumb{width:40px;height:54px;object-fit:cover;border-radius:8px;background:#1e293b;flex-shrink:0;}\n" +
                 ".sinfo{flex:1;min-width:0;}\n" +
-                ".ibox{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}\n" +
-                ".ibox td{padding:4px 8px;border-bottom:1px solid #1e293b;vertical-align:top;}\n" +
-                ".ibox td:first-child{color:#64748b;width:90px;white-space:nowrap;}\n" +
-                ".warnbox{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 16px;margin-top:12px;font-size:13px;color:#fbbf24;}\n" +
-                ".zoombg{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadein .15s ease;}\n" +
-                ".zoombg img{max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.6);cursor:default;display:block;object-fit:contain;}\n" +
-                ".collbox{margin-top:14px;padding:12px;background:#0b0f16;border:1px solid #1e293b;border-radius:12px;}\n" +
-                ".colltitle{font-size:12px;color:#64748b;text-align:center;margin-bottom:8px;}\n" +
+                ".ibox{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}\n" +
+                ".ibox td{padding:6px 12px;border-bottom:1px solid #1a2436;vertical-align:top;}\n" +
+                ".ibox td:first-child{color:#64748b;width:90px;white-space:nowrap;font-weight:500;}\n" +
+                ".warnbox{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:14px 18px;font-size:13px;color:#fbbf24;}\n" +
+                ".zoombg{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadeIn .2s;}\n" +
+                "@keyframes fadeIn{0%{opacity:0;}100%{opacity:1;}}\n" +
+                ".zoombg img{max-width:92vw;max-height:92vh;border-radius:14px;box-shadow:0 0 60px rgba(0,0,0,.6);cursor:default;display:block;object-fit:contain;animation:zoomIn .25s both;}\n" +
+                "@keyframes zoomIn{0%{opacity:0;transform:scale(.92);}100%{opacity:1;transform:scale(1);}}\n" +
+                ".collbox{padding:18px;background:rgba(11,15,22,.75);border:1px solid #1e293b;border-radius:16px;}\n" +
+                ".colltitle{font-size:12px;color:#64748b;text-align:center;margin-bottom:12px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;}\n" +
                 ".statusrow{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;}\n" +
-                ".stbtn{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;transition:.15s;font-family:inherit;}\n" +
-                ".stbtn:hover{background:#334155;color:#e2e8f0;}\n" +
-                ".stbtn.active{font-weight:600;}\n" +
-                ".stbtn.active.s1{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.5);}\n" +
-                ".stbtn.active.s2{background:rgba(52,211,153,.15);color:#34d399;border-color:rgba(52,211,153,.5);}\n" +
-                ".stbtn.active.s3{background:rgba(240,145,153,.15);color:#f09199;border-color:rgba(240,145,153,.5);}\n" +
-                ".stbtn.active.s4{background:rgba(251,191,36,.15);color:#fbbf24;border-color:rgba(251,191,36,.5);}\n" +
-                ".stbtn.active.s5{background:rgba(148,163,184,.15);color:#94a3b8;border-color:rgba(148,163,184,.5);}\n" +
-                ".progrow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;}\n" +
-                ".pbtn{width:26px;height:26px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px;cursor:pointer;line-height:1;font-family:inherit;}\n" +
-                ".pbtn:hover{background:#334155;}\n" +
-                ".progtxt{font-size:12px;color:#cbd5e1;min-width:110px;text-align:center;}\n" +
+                ".stbtn{padding:6px 14px;font-size:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;transition:all .2s;font-family:inherit;}\n" +
+                ".stbtn:hover{background:#334155;color:#e2e8f0;transform:translateY(-1px);}\n" +
+                ".stbtn.active{font-weight:700;transform:translateY(-1px);}\n" +
+                ".stbtn.active.s1{background:rgba(96,165,250,.2);color:#60a5fa;border-color:rgba(96,165,250,.5);box-shadow:0 0 14px rgba(96,165,250,.15);}\n" +
+                ".stbtn.active.s2{background:rgba(52,211,153,.2);color:#34d399;border-color:rgba(52,211,153,.5);box-shadow:0 0 14px rgba(52,211,153,.15);}\n" +
+                ".stbtn.active.s3{background:rgba(240,145,153,.2);color:#f09199;border-color:rgba(240,145,153,.5);box-shadow:0 0 14px rgba(240,145,153,.15);}\n" +
+                ".stbtn.active.s4{background:rgba(251,191,36,.2);color:#fbbf24;border-color:rgba(251,191,36,.5);box-shadow:0 0 14px rgba(251,191,36,.15);}\n" +
+                ".stbtn.active.s5{background:rgba(148,163,184,.2);color:#94a3b8;border-color:rgba(148,163,184,.5);box-shadow:0 0 14px rgba(148,163,184,.15);}\n" +
+                ".rategrid{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;}\n" +
+                ".ratebtn{width:32px;height:32px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;}\n" +
+                ".ratebtn:hover{background:#334155;border-color:#fbbf24;color:#fbbf24;}\n" +
+                ".ratebtn.active{background:rgba(251,191,36,.2);color:#fbbf24;border-color:rgba(251,191,36,.5);box-shadow:0 0 10px rgba(251,191,36,.15);}\n" +
+                ".ratebtn.active:hover{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444;}\n" +
+                ".progrow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;}\n" +
+                ".pbtn{width:32px;height:32px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px;cursor:pointer;line-height:1;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;}\n" +
+                ".pbtn:hover{background:#334155;border-color:#6366f1;color:#a5b4fc;}\n" +
+                ".progtxt{font-size:13px;color:#cbd5e1;text-align:center;font-weight:500;}\n" +
+                ".proginput{width:72px;padding:5px 8px;border-radius:8px;border:1px solid #334155;background:#10161f;color:#e2e8f0;font-size:14px;font-weight:600;text-align:center;font-family:inherit;}\n" +
+                ".proginput:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.15);}\n" +
                 ".pgnrow{display:flex;gap:4px;justify-content:center;margin-top:16px;flex-wrap:wrap;}\n" +
-                ".pgnbtn{width:32px;height:32px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:13px;cursor:pointer;font-family:inherit;}\n" +
-                ".pgnbtn:hover{background:#334155;color:#e2e8f0;}\n" +
-                ".pgnbtn.active{background:#6366f1;border-color:#6366f1;color:#fff;}\n" +
+                ".pgnbtn{width:36px;height:36px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;}\n" +
+                ".pgnbtn:hover{background:#334155;color:#e2e8f0;transform:translateY(-1px);}\n" +
+                ".pgnbtn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;}\n" +
+                ".progress-bar{display:flex;height:8px;background:#1e293b;border-radius:6px;overflow:hidden;margin:12px 0;}\n" +
+                ".progress-bar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#6366f1,#f09199);transition:width .5s;}\n" +
+                ".al-compare{display:flex;gap:20px;justify-content:center;align-items:center;margin-top:16px;padding:14px;background:rgba(11,15,22,.75);border-radius:14px;border:1px solid #1e293b;}\n" +
+                ".al-compare .al-item{text-align:center;flex:1;}\n" +
+                ".al-compare .al-label{font-size:11px;color:#64748b;margin-bottom:4px;}\n" +
+                ".al-compare .al-score{font-size:28px;font-weight:800;line-height:1.2;}\n" +
+                ".al-compare .al-score.bgm{color:#f09199;}\n" +
+                ".al-compare .al-score.ani{color:#8b5cf6;}\n" +
+                ".al-compare .vs{font-size:14px;color:#334155;font-weight:700;padding:0 6px;}\n" +
+                ".comment-item{padding:14px;border-bottom:1px solid #1a2436;transition:background .2s;}\n" +
+                ".comment-item:last-child{border-bottom:none;}\n" +
+                ".comment-item:hover{background:rgba(148,163,184,.03);}\n" +
+                ".comment-user{display:flex;align-items:center;gap:10px;margin-bottom:6px;}\n" +
+                ".comment-avatar{width:34px;height:34px;border-radius:50%;background:#1e293b;object-fit:cover;flex-shrink:0;}\n" +
+                ".comment-name{font-weight:600;font-size:13px;color:#e2e8f0;}\n" +
+                ".comment-date{font-size:11px;color:#64748b;margin-left:auto;}\n" +
+                ".comment-text{font-size:13px;color:#cbd5e1;white-space:pre-wrap;word-break:break-word;padding-left:44px;}\n" +
+                ".blog-more{color:#6366f1;font-size:12px;cursor:pointer;margin-left:4px;}\n" +
+                ".blog-more:hover{text-decoration:underline;}\n" +
+                ".comment-input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid #334155;background:#10161f;color:#e2e8f0;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;transition:border-color .25s;}\n" +
+                ".comment-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.12);}\n" +
+                ".comment-submit{display:flex;gap:10px;align-items:center;margin-top:10px;}\n" +
+                ".progbar-wrap{padding:2px 0;}\n" +
                 "</style>\n" +
                 "</head>\n" +
                 "<body>\n" +
                 "<div class=\"wrap\" id=\"app\"></div>\n" +
                 "<script>\n" +
                 "(function(){\n" +
+                "  console.log('[bangumi-webview] script started, webview=' + !!window.webview);\n" +
                 "  var app0=document.getElementById('app');\n" +
                 "  app0.innerHTML='<div class=\"card center\"><div class=\"spinner\"></div><div class=\"muted\">页面脚本已启动，等待数据…</div></div>';\n" +
                 "  if(!window.webview){\n" +
@@ -998,9 +1109,10 @@ function init() {
                 "  var vm=null;\n" +
                 "  var gotFirst=false;\n" +
                 "  var lastSid=0;\n" +
-                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null,pendingStatus=null,epsPage=1;\n" +
+                "  var searchVal='',idVal='',panelOpen=false,activeTab='chars',pendingEp=null,pendingStatus=null,epsPage=1,calDay=0;\n" +
                 "  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n" +
                 "  function num(x){var n=Number(x);return isNaN(n)?0:n;}\n" +
+                "  function fmtNum(n){var s=String(Math.floor(n));var r='';for(var i=s.length-3;i>0;i-=3){r=','+s.substring(i,i+3)+r;}return s.substring(0,i+3)+r;}\n" +
                 "  window.webview.on('vm',function(v){\n" +
                 "    gotFirst=true;\n" +
                 "    pendingEp=null;\n" +
@@ -1044,29 +1156,35 @@ function init() {
                 "    if(!vm){app.innerHTML='';return;}\n" +
                 "    var h='';\n" +
                 "    h+=renderTopbar();\n" +
+                "    if(panelOpen||vm.status==='not-found'||vm.status==='error'||vm.status==='idle'){h+=renderPanel();}\n" +
                 "    if(vm.status==='idle'){h+=renderIdle();}\n" +
                 "    else if(vm.status==='loading'){h+=renderLoading();}\n" +
                 "    else if(vm.status==='error'){h+=renderError();}\n" +
                 "    else if(vm.status==='not-found'){h+=renderNotFound();}\n" +
                 "    else if(vm.status==='ready'&&vm.subject){h+=renderReady();}\n" +
-                "    if(panelOpen||vm.status==='not-found'||vm.status==='error'||vm.status==='idle'){h+=renderPanel();}\n" +
                 "    app.innerHTML=h;\n" +
                 "    var si=document.getElementById('bgm-q');if(si)si.value=searchVal;\n" +
                 "    var ii=document.getElementById('bgm-id');if(ii)ii.value=idVal;\n" +
+                "    if(activeTab==='comments'&&vm&&vm.subjectId&&vm.subjectBlogs===null){window.webview.send('load-subject-blog',vm.subjectId);}\n" +
+                "    if(activeTab==='topics'&&vm&&vm.subjectTopics===null&&vm.subjectId){window.webview.send('load-subject-blog',vm.subjectId);}\n" +
+                "    if(activeTab==='cal'&&(!vm||vm.calendar===null)){window.webview.send('load-calendar','1');}\n" +
                 "  }\n" +
                 "  function renderTopbar(){\n" +
-                "    var h='<div class=\"topbar\"><div class=\"brand\"><span class=\"dot\"></span>Bangumi 番组计划';\n" +
-                "    if(vm.subjectId)h+=chip('ID '+vm.subjectId,'');\n" +
-                "    if(vm.endpoint)h+=chip(vm.endpoint.replace(/^https?:\\/\\//,''),'green');\n" +
-                "    if(vm.bound)h+=chip('已绑定','pink');\n" +
-                "    h+='</div><div class=\"btnrow\">';\n" +
-                "    h+='<button class=\"btn\" data-action=\"refresh\" title=\"Refresh\">刷新</button>';\n" +
+                "    var h='<div class=\"topbar\">';\n" +
+                "    h+='<div class=\"topbar-left\">';\n" +
+                "    h+='<span class=\"badge badge-brand\">Bangumi 番组计划</span>';\n" +
+                "    h+='<div class=\"chips\">';\n" +
+                "    if(vm.subjectId)h+='<span class=\"badge badge-id\" data-action=\"copy-id\" data-payload=\"'+vm.subjectId+'\" title=\"点击复制 ID\">ID:'+vm.subjectId+'</span>';\n" +
+                "    if(vm.bound)h+='<span class=\"badge badge-bound\">已绑定</span>';\n" +
+                "    if(vm.endpoint)h+='<span class=\"badge badge-ep\">'+esc(vm.endpoint.replace(/^https?:\\/\\//,''))+'</span>';\n" +
+                "    h+='</div></div>';\n" +
+                "    h+='<div class=\"topbar-right\">';\n" +
+                "    h+='<button class=\"btn\" data-action=\"refresh\" title=\"刷新\">刷新</button>';\n" +
                 "    if(vm.subjectId){\n" +
-                "      h+='<button class=\"btn\" data-action=\"copy-link\" data-payload=\"'+vm.subjectId+'\" title=\"Copy Link\">复制链接</button>';\n" +
-                "      h+='<button class=\"btn\" data-action=\"open-bgm\" data-payload=\"'+vm.subjectId+'\" title=\"Open in Bangumi\">在 Bangumi 打开</button>';\n" +
+                "      h+='<button class=\"btn\" data-action=\"copy-link\" data-payload=\"https://bgm.tv/subject/'+vm.subjectId+'\" title=\"复制 Bangumi 链接\">复制 Bangumi 链接</button>';\n" +
                 "    }\n" +
-                "    h+='<button class=\"btn\" data-action=\"toggle-panel\" title=\"Manual Match\">手动匹配</button>';\n" +
-                "    if(vm.subjectId)h+='<button class=\"btn danger\" data-action=\"clear-cache\" title=\"Clear Cache\">清除缓存</button>';\n" +
+                "    h+='<button class=\"btn\" data-action=\"toggle-panel\" title=\"手动匹配\">手动匹配</button>';\n" +
+                "    if(vm.subjectId)h+='<button class=\"btn danger\" data-action=\"clear-cache\" title=\"清除缓存\">清除缓存</button>';\n" +
                 "    h+='</div></div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
@@ -1132,24 +1250,28 @@ function init() {
                 "      if(ad&&ad>=today&&(!nx||ad<(nx.air_date||'')))nx=vm.eps[i];\n" +
                 "    }\n" +
                 "    if(!nx)return '';\n" +
-                "    var nlabel=(nx.air_date===today?'今天播出':'下一话')+' 第'+(nx.sort!=null?nx.sort:'?')+'话';\n" +
+                "    var nlabel='下一话 第'+(nx.sort!=null?nx.sort:'?')+'话';\n" +
                 "    if(nx.air_date!==today)nlabel+=' · '+nx.air_date;\n" +
                 "    return '<div class=\"nextep\">'+esc(nlabel)+'</div>';\n" +
                 "  }\n" +
                 "  function renderScoreBox(s,e){\n" +
                 "    var r=s.rating||{};\n" +
                 "    var sc=num(r.score);\n" +
+                "    var alScore=e&&e.score?num(e.score)/10:0;\n" +
                 "    var h='<div class=\"scorebox\">';\n" +
-                "    h+='<div class=\"scorerow\">';\n" +
                 "    if(sc>0){\n" +
-                "      h+='<div class=\"score-num\" style=\"color:'+scoreColor(sc)+'\">'+sc.toFixed(1)+'<span class=\"score-max\"> /10</span></div>';\n" +
-                "      h+='<div class=\"scoresub\">';\n" +
-                "      if(r.rank)h+='<div class=\"chip gold\">Rank #'+r.rank+'</div>';\n" +
-                "      if(r.total)h+='<div class=\"muted small\" style=\"margin-top:6px;\">'+r.total+' 人评分</div>';\n" +
+                "      var col=scoreColor(sc);\n" +
+                "      h+='<div style=\"font-size:48px;font-weight:800;line-height:1;color:'+col+';\">'+sc.toFixed(1)+'<span style=\"font-size:16px;color:#64748b;font-weight:500;\"> /10</span></div>';\n" +
+                "      h+='<div style=\"margin-top:4px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;\">';\n" +
+                "      if(r.rank)h+='<span class=\"chip gold\">Rank #'+r.rank+'</span>';\n" +
+                "      if(r.total)h+='<span class=\"chip\">'+fmtNum(r.total)+' 人评分</span>';\n" +
                 "      h+='</div>';\n" +
-                "    }else{h+='<div class=\"muted\">暂无评分</div>';}\n" +
+                "    }else{h+='<div class=\"muted\" style=\"padding:20px 0;\">暂无评分</div>';}\n" +
+                "    h+='<div class=\"al-compare\">';\n" +
+                "    h+='<div class=\"al-item\"><div class=\"al-label\">Bangumi</div><div class=\"al-score bgm\">'+(sc>0?sc.toFixed(1):'--')+'</div></div>';\n" +
+                "    h+='<div class=\"vs\">VS</div>';\n" +
+                "    h+='<div class=\"al-item\"><div class=\"al-label\">AniList</div><div class=\"al-score ani\">'+(alScore>0?alScore.toFixed(1):'--')+'</div></div>';\n" +
                 "    h+='</div>';\n" +
-                "    if(e.score){h+='<div class=\"muted small\" style=\"margin-top:8px;text-align:center;\">AniList '+(e.score/10).toFixed(1)+' /10</div>';}\n" +
                 "    h+=renderDist(r.count);\n" +
                 "    h+='</div>';\n" +
                 "    return h;\n" +
@@ -1203,13 +1325,23 @@ function init() {
                 "    if(cur){\n" +
                 "      var ep=(pendingEp!==null)?pendingEp:((col&&col.ep_status)||0);\n" +
                 "      var total=(s.eps||s.eps_count||s.total_episodes)||0;\n" +
+                "      var pct=total>0?Math.min(100,Math.round(ep/total*100)):0;\n" +
                 "      h+='<div class=\"progrow\">';\n" +
                 "      h+='<button class=\"pbtn\" data-action=\"prog-dec\" title=\"Decrease Progress\">−</button>';\n" +
-                "      h+='<span class=\"progtxt\">看到第 '+ep+' 话'+(total?' / 共 '+total+' 话':'')+'</span>';\n" +
+                "      h+='<input class=\"proginput\" id=\"bgm-prog-input\" type=\"number\" min=\"0\" max=\"'+(total||999)+'\" value=\"'+ep+'\" data-action=\"prog-set\">';\n" +
+                "      h+='<span class=\"progtxt\">/ '+(total?'共 '+total+' 话':'')+'</span>';\n" +
                 "      h+='<button class=\"pbtn\" data-action=\"prog-inc\" title=\"Increase Progress\">+</button>';\n" +
                 "      h+='</div>';\n" +
+                "      if(total>0){h+='<div class=\"progbar-wrap\"><div class=\"progress-bar\"><div class=\"fill\" style=\"width:'+pct+'%;\"></div></div><div class=\"muted small\" style=\"text-align:center;\">'+pct+'%</div></div>';}\n" +
                 "    }\n" +
-                "    if(col&&col.rate)h+='<div style=\"margin-top:8px;text-align:center;\">'+chip('我的评分 '+col.rate,'gold')+'</div>';\n" +
+                "    h+='<div style=\"margin-top:10px;\">';\n" +
+                "    h+='<div class=\"muted small\" style=\"text-align:center;margin-bottom:6px;\">我的评分</div>';\n" +
+                "    h+='<div class=\"rategrid\">';\n" +
+                "    var myRate=(col&&col.rate)||0;\n" +
+                "    for(var ri=1;ri<=10;ri++){\n" +
+                "      h+='<button class=\"ratebtn'+(myRate===ri?' active':'')+'\" data-action=\"set-rate\" data-payload=\"'+ri+'\">'+ri+'</button>';\n" +
+                "    }\n" +
+                "    h+='</div></div>';\n" +
                 "    h+='</div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
@@ -1266,15 +1398,20 @@ function init() {
                 "    return shown?h+'</table>':'';\n" +
                 "  }\n" +
                 "  function renderTabs(){\n" +
-                "    var tabs=[['chars','角色'],['eps','章节'],['rels','关联条目']];\n" +
+                "    var tabs=[['chars','角色'],['eps','章节'],['rels','关联条目'],['comments','评论'],['topics','讨论'],['cal','每日放送']];\n" +
                 "    var h='<div class=\"tabs\">';\n" +
                 "    for(var i=0;i<tabs.length;i++){\n" +
                 "      h+='<button class=\"tab'+(activeTab===tabs[i][0]?' active':'')+'\" data-action=\"tab\" data-payload=\"'+tabs[i][0]+'\">'+tabs[i][1]+'</button>';\n" +
                 "    }\n" +
                 "    h+='</div>';\n" +
+                "    h+='<div class=\"tab-content\">';\n" +
                 "    if(activeTab==='chars')h+=renderChars();\n" +
                 "    else if(activeTab==='eps')h+=renderEps();\n" +
-                "    else h+=renderRels();\n" +
+                "    else if(activeTab==='rels')h+=renderRels();\n" +
+                "    else if(activeTab==='comments')h+=renderComments();\n" +
+                "    else if(activeTab==='topics')h+=renderTopics();\n" +
+                "    else if(activeTab==='cal')h+=renderCalendar();\n" +
+                "    h+='</div>';\n" +
                 "    return h;\n" +
                 "  }\n" +
                 "  function renderChars(){\n" +
@@ -1284,7 +1421,8 @@ function init() {
                 "      var c=vm.chars[i];\n" +
                 "      var img=(c.images&&(c.images.medium||c.images.small||c.images.grid))||'';\n" +
                 "      var full=(c.images&&c.images.large)||img;\n" +
-                "      h+='<div class=\"citem\">';\n" +
+                "      var cTip=esc(c.name||'')+(c.relation?' ['+esc(c.relation)+']':'')+(c.actors&&c.actors.length?' CV: '+esc(c.actors[0].name||''):'');\n" +
+                "      h+='<div class=\"citem\" title=\"'+cTip+'\">';\n" +
                 "      if(img)h+=\"<img class='cimg' src='\"+esc(img)+\"' data-action='zoom-img' data-fullsrc='\"+esc(full)+\"' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
                 "      h+='<div class=\"cname\">'+esc(c.name)+'</div>';\n" +
                 "      if(c.relation)h+='<div class=\"crel\">'+esc(c.relation)+'</div>';\n" +
@@ -1304,12 +1442,15 @@ function init() {
                 "    if(epsPage>total)epsPage=total;\n" +
                 "    var start=(epsPage-1)*100;\n" +
                 "    var slice=vm.eps.slice(start,start+100);\n" +
+                "    var watched=vm&&vm.collection&&vm.collection.ep_status||0;\n" +
                 "    var h='<table class=\"eptable\">';\n" +
                 "    for(var i=0;i<slice.length;i++){\n" +
                 "      var ep=slice[i];\n" +
+                "      var epSort=ep.sort!=null?ep.sort:(start+i+1);\n" +
+                "      var seen=epSort>0&&epSort<=watched;\n" +
                 "      var nm=ep.name_cn||ep.name||'';\n" +
                 "      var sub=(ep.name_cn&&ep.name&&ep.name!==ep.name_cn)?ep.name:'';\n" +
-                "      h+='<tr><td class=\"epnum\">'+(ep.sort!=null?ep.sort:(start+i+1))+'</td><td>'+esc(nm);\n" +
+                "      h+='<tr class=\"'+(seen?'epseen':'')+'\"><td class=\"epnum\">'+(seen?'✓ ':'')+epSort+'</td><td>'+esc(nm);\n" +
                 "      if(sub)h+='<div class=\"muted small\">'+esc(sub)+'</div>';\n" +
                 "      h+='</td><td class=\"epdate\">'+esc(ep.air_date||'')+'</td></tr>';\n" +
                 "    }\n" +
@@ -1329,7 +1470,7 @@ function init() {
                 "    for(var i=0;i<vm.rels.length&&i<24;i++){\n" +
                 "      var r=vm.rels[i];\n" +
                 "      var img=(r.images&&(r.images.small||r.images.grid))||'';\n" +
-                "      h+='<div class=\"relitem\">';\n" +
+                "      h+='<div class=\"relitem\" title=\"'+esc(r.relation||'')+' · '+esc(r.name_cn||r.name||'')+'\">';\n" +
                 "      if(r.relation)h+='<div class=\"reltype\">'+esc(r.relation)+'</div>';\n" +
                 "      h+='<div style=\"display:flex;gap:8px;margin-top:4px;\">';\n" +
                 "      if(img)h+=\"<img src='\"+esc(img)+\"' style='width:34px;height:46px;object-fit:cover;border-radius:4px;background:#1e293b;flex-shrink:0;' onerror=\\\"this.style.display='none';\\\" referrerpolicy='no-referrer'>\";\n" +
@@ -1337,10 +1478,85 @@ function init() {
                 "      if(r.name_cn&&r.name&&r.name!==r.name_cn)h+='<div class=\"muted small\">'+esc(r.name)+'</div>';\n" +
                 "      h+='</div></div>';\n" +
                 "      h+='<div class=\"relbtns\"><button class=\"btn small\" data-action=\"bind-pick\" data-payload=\"'+r.id+'\" title=\"Bind This Entry\">绑定此项</button>';\n" +
-                "      h+='<button class=\"btn small ghost\" data-action=\"open-bgm\" data-payload=\"'+r.id+'\" title=\"Open in Bangumi\">打开</button></div>';\n" +
+                "      h+='<button class=\"btn small ghost\" data-action=\"open-bgm\" data-payload=\"'+r.id+'\" title=\"复制链接\"> 复制</button></div>';\n" +
                 "      h+='</div>';\n" +
                 "    }\n" +
                 "    return h+'</div>';\n" +
+                "  }\n" +
+                "  function renderComments(){\n" +
+                "    var sid=vm&&vm.subjectId;\n" +
+                "    if(!sid)return '<div class=\"muted center\" style=\"padding:30px;\">暂无条目</div>';\n" +
+                "    var blogs=vm.subjectBlogs;\n" +
+                "    var h='';\n" +
+                "    if(blogs===null){h+='<div class=\"muted center\" style=\"padding:30px;\">加载中…</div>';}\n" +
+                "    else if(blogs===false){h+='<div class=\"muted center\" style=\"padding:30px;\">加载失败 <button class=\"btn small\" data-action=\"reload-blog\" style=\"margin-left:8px;\">重试</button></div>';}\n" +
+                "    else if(!blogs.length){h+='<div class=\"muted center\" style=\"padding:30px;\">暂无日志</div>';}\n" +
+                "    else{\n" +
+                "      for(var i=0;i<blogs.length;i++){\n" +
+                "        var b=blogs[i];\n" +
+"        var u=b.user||{};\n" +
+                "        var avatar=(u.avatar&&(u.avatar.medium||u.avatar.small||u.avatar.large))||'';\n" +
+                "        var fc=(b.content||b.summary||'');\n" +
+                "        var bid=b.id;if(!bid)continue;\n" +
+                "        var blogUrl='https://bgm.tv/blog/'+bid;\n" +
+                "        h+='<div class=\"comment-item\">';\n" +
+                "        h+='<div class=\"comment-user\">';\n" +
+                "        if(avatar)h+=\"<img class='comment-avatar' src='\"+esc(avatar)+\"' onerror=\\\"this.style.display='none';\\\">\";\n" +
+                "        else h+='<div class=\"comment-avatar\" style=\"display:inline-flex;align-items:center;justify-content:center;background:#334155;color:#94a3b8;font-size:12px;\">'+esc((u.nickname||'?')[0])+'</div>';\n" +
+                "        h+='<span class=\"comment-name\">'+esc(u.nickname||'匿名')+'</span>';\n" +
+                "        h+='<span class=\"comment-date\">'+esc(b.dateline||'')+'</span>';\n" +
+                "        h+='</div>';\n" +
+                "        h+='<div class=\"comment-text\">'+(b.replies!==undefined?'<span class=\"muted small\">'+b.replies+' 回复</span> ':'')+'<strong>'+esc(b.title||'')+'</strong><br>'+fc+' <span class=\"blog-more\" data-action=\"copy-blog\" data-payload=\"'+blogUrl+'\" title=\"复制链接\">复制链接</span></div>';\n" +
+                "        h+='</div>';\n" +
+                "      }\n" +
+                "    }\n" +
+                "    return h;\n" +
+                "  }\n" +
+                "  function renderTopics(){\n" +
+                "    var topics=vm&&vm.subjectTopics;\n" +
+                "    if(!topics)return '<div class=\"muted center\" style=\"padding:30px;\">'+(vm.subjectTopics===null?'加载中…':'暂无讨论')+'</div>';\n" +
+                "    if(!topics.length)return '<div class=\"muted center\" style=\"padding:30px;\">暂无讨论</div>';\n" +
+                "    var h='';\n" +
+                "    for(var ti=0;ti<topics.length;ti++){\n" +
+                "      var tp=topics[ti];if(!tp||!tp.id)continue;var tu=tp.user||{};\n" +
+                "      h+='<div class=\"comment-item\" style=\"cursor:pointer;\" data-action=\"show-topic\" data-payload=\"'+tp.id+'\" title=\"点击复制链接\">';\n" +
+                "      h+='<div class=\"comment-text\"><strong>'+esc(tp.title||'')+'</strong><div class=\"muted small\" style=\"margin-top:2px;\">'+esc(tu.nickname||'')+' · '+(tp.replies!==undefined?tp.replies+' 回复':'')+'</div></div></div>';\n" +
+                "    }\n" +
+                "    return h;\n" +
+                "  }\n" +
+                "  function renderCalendar(){\n" +
+                "    var cal=vm&&vm.calendar;\n" +
+                "    if(cal===null)return '<div class=\"card center\"><div class=\"spinner\"></div><div class=\"muted\">加载中…</div></div>';\n" +
+                "    if(cal===false||!cal.length)return '<div class=\"card center\"><div class=\"muted\">暂无数据</div></div>';\n" +
+                "    var h='';\n" +
+                "    var now=new Date();var todayId=now.getDay();if(todayId===0)todayId=7;\n" +
+                "    h+='<div class=\"cal-nav\" style=\"display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;\">';\n" +
+                "    for(var di=0;di<cal.length;di++){\n" +
+                "      var day=cal[di];\n" +
+                "      if(!day||!day.items)continue;var wd=(day.weekday&&day.weekday.id)||(di+1);\n" +
+                "      h+='<button class=\"btn cal-day'+(calDay===wd?' primary':'')+'\" data-action=\"cal-day\" data-payload=\"'+wd+'\" style=\"font-size:12px;\">'+esc((day.weekday&&day.weekday.cn)||'周'+(wd))+'</button>';\n" +
+                "    }\n" +
+                "    h+='</div>';\n" +
+                "    if(!calDay)calDay=todayId;\n" +
+                "    for(var di=0;di<cal.length;di++){\n" +
+                "      var day=cal[di];if(!day)continue;\n" +
+                "      var wd=(day.weekday&&day.weekday.id)||(di+1);\n" +
+                "      if(wd!==calDay||!day.items||!day.items.length)continue;\n" +
+                "      h+='<div class=\"relgrid\">';\n" +
+                "      for(var si=0;si<day.items.length;si++){\n" +
+                "        var sub=day.items[si];\n" +
+                "        var img=(sub.images&&(sub.images.common||sub.images.medium||sub.images.small))||'';\n" +
+                "        var scr=sub.rating&&sub.rating.score?'<span class=\"chip pink\">'+sub.rating.score.toFixed(1)+'</span>':'';\n" +
+                "        h+='<div class=\"relitem\" data-action=\"open-url\" data-payload=\"https://bgm.tv/subject/'+sub.id+'\" style=\"cursor:pointer;\">';\n" +
+                "        if(img)h+=\"<img src='\"+esc(img)+\"' style='width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:#1e293b;' onerror=\\\"this.style.display='none';\\\">\";\n" +
+                "        h+='<div class=\"relname\">'+esc(sub.name_cn||sub.name||'')+'</div>';\n" +
+                "        if(sub.name_cn&&sub.name&&sub.name!==sub.name_cn)h+='<div class=\"muted small\">'+esc(sub.name)+'</div>';\n" +
+                "        if(scr)h+='<div style=\"margin-top:4px;\">'+scr+'</div>';\n" +
+                "        h+='</div>';\n" +
+                "      }\n" +
+                "      h+='</div>';\n" +
+                "    }\n" +
+                "    return h;\n" +
                 "  }\n" +
                 "  function renderPanel(){\n" +
                 "    var h='<div class=\"panel\"><div style=\"font-weight:700;margin-bottom:6px;\">手动匹配</div>';\n" +
@@ -1372,15 +1588,21 @@ function init() {
                 "        var a=t.getAttribute('data-action');\n" +
                 "        var p=t.getAttribute('data-payload')||'';\n" +
                 "        if(a==='do-search'){var q=document.getElementById('bgm-q');window.webview.send('search',q?q.value:'');}\n" +
-                "        else if(a==='bind-id-btn'){var b=document.getElementById('bgm-id');window.webview.send('bind-id',b?b.value:'');}\n" +
+                "        else if(a==='bind-id-btn'){var b=document.getElementById('bgm-id');panelOpen=false;window.webview.send('bind-id',b?b.value:'');render();}\n" +
+                "        else if(a==='bind-pick'){panelOpen=false;window.webview.send('bind-pick',p);}\n" +
                 "        else if(a==='toggle-panel'){panelOpen=!panelOpen;render();}\n" +
                 "        else if(a==='tab'){activeTab=p;render();}\n" +
-                "        else if(a==='copy-link'){\n" +
-                "          var url='https://bgm.tv/subject/'+p;\n" +
-                "          var ta=document.createElement('textarea');ta.value=url;document.body.appendChild(ta);ta.select();\n" +
-                "          try{document.execCommand('copy');}catch(e){}\n" +
+                "        else if(a==='copy-id'&&p){\n" +
+                "          var idOrig=t.textContent;\n" +
+                "          var ta=document.createElement('textarea');ta.value=p;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();\n" +
+                "          try{document.execCommand('copy');t.textContent='已复制';setTimeout(function(){t.textContent=idOrig;},1200);}catch(e){}\n" +
                 "          document.body.removeChild(ta);\n" +
-                "          t.textContent='已复制';setTimeout(function(){t.textContent='复制链接';},1200);\n" +
+                "        }\n" +
+                "        else if(a==='copy-link'&&p){\n" +
+                "          var linkOrig=t.textContent;\n" +
+                "          var ta=document.createElement('textarea');ta.value=p;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();\n" +
+                "          try{document.execCommand('copy');t.textContent='已复制';setTimeout(function(){t.textContent=linkOrig;},1200);}catch(e){}\n" +
+                "          document.body.removeChild(ta);\n" +
                 "        }\n" +
                 "        else if(a==='zoom-img'){\n" +
                 "          var fs=t.getAttribute('data-fullsrc')||t.src;if(fs)showZoom(fs);\n" +
@@ -1391,10 +1613,25 @@ function init() {
                 "          render();\n" +
                 "          window.webview.send('set-status',p);\n" +
                 "        }\n" +
+                "        else if(a==='set-rate'){\n" +
+                "          var curRate=(vm&&vm.collection&&vm.collection.rate)||0;\n" +
+                "          window.webview.send('set-rate',parseInt(p,10)===curRate?'0':p);\n" +
+                "        }\n" +
                 "        else if(a==='eps-page'){\n" +
                 "          epsPage=parseInt(p,10)||1;\n" +
                 "          render();\n" +
                 "        }\n" +
+                "        else if(a==='cal-day'){calDay=parseInt(p,10)||1;render();}\n" +
+                "        else if(a==='reload-blog'){window.webview.send('reload-blog','1');}\n" +
+                "        else if(a==='show-topic'){var stUrl='https://bgm.tv/topic/'+p;var ta=document.createElement('textarea');ta.value=stUrl;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');t.textContent='✓ 已复制，浏览器查看';setTimeout(function(){render();},2000);}catch(e){}document.body.removeChild(ta);}\n" +
+                                "        else if(a==='open-bgm'&&p){var obUrl='https://bgm.tv/subject/'+p;var ta=document.createElement('textarea');ta.value=obUrl;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');t.textContent='✓ 已复制';setTimeout(function(){render();},2000);}catch(e){}document.body.removeChild(ta);}\n" +
+                "        else if(a==='copy-blog'&&p){\n" +
+                "          var ta=document.createElement('textarea');ta.value=p;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();\n" +
+                "          try{document.execCommand('copy');t.textContent='✓ 已复制';setTimeout(function(){render();},2000);}catch(e){}\n" +
+                "          document.body.removeChild(ta);\n" +
+                "        }\n" +
+                "        else if(a==='open-url'&&p){var ouUrl=p;var ta=document.createElement('textarea');ta.value=ouUrl;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');t.textContent='✓ 已复制，浏览器查看';setTimeout(function(){render();},2000);}catch(e){}document.body.removeChild(ta);}\n" +
+                "        else if(a==='prog-set'){var pi=document.getElementById('bgm-prog-input');if(pi){var nv=parseInt(pi.value,10);if(!isNaN(nv)&&nv>=0){pendingEp=nv;render();window.webview.send('set-progress',String(nv));}}}\n" +
                 "        else if(a==='prog-inc'||a==='prog-dec'){\n" +
                 "          var col0=vm&&vm.collection;\n" +
                 "          var base=(pendingEp!==null)?pendingEp:((col0&&col0.ep_status)||0);\n" +
@@ -1414,6 +1651,7 @@ function init() {
                 "  document.addEventListener('keydown',function(ev){\n" +
                 "    if(ev.target&&ev.target.id==='bgm-q'&&ev.key==='Enter'){window.webview.send('search',ev.target.value);}\n" +
                 "    if(ev.target&&ev.target.id==='bgm-id'&&ev.key==='Enter'){window.webview.send('bind-id',ev.target.value);}\n" +
+                "    if(ev.target&&ev.target.id==='bgm-prog-input'&&ev.key==='Enter'){var nv=parseInt(ev.target.value,10);if(!isNaN(nv)&&nv>=0){pendingEp=nv;render();window.webview.send('set-progress',String(nv));ev.target.style.borderColor='#34d399';ev.target.style.boxShadow='0 0 0 2px rgba(52,211,153,.2)';setTimeout(function(){if(ev.target){ev.target.style.borderColor='';ev.target.style.boxShadow='';}},800);}}\n" +
                 "  });\n" +
                 "})();\n" +
                 "</script>\n" +

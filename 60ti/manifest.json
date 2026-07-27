@@ -9,6 +9,7 @@
   "lang": "zh",
   "payloadURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/provider.js",
   "manifestURI": "https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/manifest.json",
+  “icon”:"https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/60ti/icon.png",
   "userConfig": {
     "requiresConfig": false,
     "version": 1,

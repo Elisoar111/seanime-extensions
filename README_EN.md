@@ -10,7 +10,7 @@
 
 | Extension | Type | Version | Description |
 |-----------|------|---------|-------------|
-| **[Bangumi](./Bangumi)** | Plugin | v1.1.3 | View full Bangumi metadata in the Seanime sidebar with collection management |
+| **[Bangumi](./Bangumi)** | Plugin | v1.2.0 | View full Bangumi metadata in the Seanime sidebar with collection management |
 | **[AniBT](./anibt)** | Anime Torrent | v1.3.0 | Search anime torrent magnet links via AniBT |
 | **[Anime Garden](./Anime-Garden)** | Anime Torrent | v1.0.1 | Real-time, accurate Chinese-subtitled anime torrents |
 | **[Mikan Project](./mikan-project)** | Anime Torrent | v1.1.0 | Search anime torrents via Mikan Project RSS |

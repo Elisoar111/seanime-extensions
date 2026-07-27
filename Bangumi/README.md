@@ -1,95 +1,77 @@
-# Bangumi UI — Seanime 插件 / Plugin
+# Bangumi 番组计划 — Seanime 插件
 
 在 [Seanime](https://seanime.app) 侧栏查看 [Bangumi 番组计划](https://bgm.tv) 的完整元数据，支持收藏管理与观看进度同步。
 
-View full [Bangumi](https://bgm.tv) metadata — ratings, characters, episodes, relations, and more — from the Seanime sidebar. Manage your Bangumi collection and watch progress.
+---
+
+## 功能
+
+### 条目展示
+- **自动匹配** — 日文优先，多标题候选 + 年份加权
+- **评分系统** — 评分 + Rank + 分布图，与 AniList 评分对比，评分人数千分位
+- **条目信息** — 中/日文标题、播出日期、话数、平台、标签、简介、Infobox
+- **角色列表** — 网格卡片，点击图片放大，hover 显示声优
+- **章节列表** — 表格分页，已看集数绿色标记
+- **关联条目** — 关系卡片，可绑定
+
+### 日志与讨论
+- **条目日志** — 读取条目的评论日志，显示完整内容，复制链接
+- **条目讨论** — 独立标签展示讨论话题，复制链接到浏览器查看
+
+### 每日放送
+- 按星期筛选本周放送番剧
+
+### 收藏管理
+- 状态设置：想看 / 看过 / 在看 / 搁置 / 抛弃
+- 观看进度：+/- 按钮 + 手动输入 + Enter 提交 + 进度条
+- 评分：1-10 评分按钮，点击已评分可取消
+
+### 交互
+- 顶栏：品牌标签、ID 徽章（点击复制 ID）、已绑定状态、端点信息
+- 复制 Bangumi 链接、复制 ID、复制日志链接
+- 手动匹配面板位于顶栏下方，绑定后自动关闭
+- 所有外部链接复制到剪贴板，提示到浏览器查看
+- 加载失败显示重试按钮
+
+### 底层
+- 多端点故障转移，429 退避重试
+- 3 天本地缓存
 
 ---
 
-## 功能 / Features
+## 安装
 
-- **Matching** — Auto-search Bangumi entries (Japanese-first, multi-title candidates with year bonus)
-- **Ratings** — Bangumi score + rank + distribution chart, compared with AniList score
-- **Info** — Chinese/Japanese titles, air date, episodes, platform, tags, summary, infobox
-- **Characters** — Character list with up to 2 voice actors; click image to zoom
-- **Episodes** — Full episode table; auto-calculates next airing episode
-- **Relations** — Sequel/prequel/spin-off cards with bind and open links
-- **Collection Management** — Set wish/watching/watched/on-hold/dropped; +/- episode progress (requires Access Token)
-- **Token Validation** — UI warning when token is invalid or expired
-- **Failover** — Multi-endpoint auto-switch; 429 backoff retry; mirror appended automatically
-- **Cache** — 3-day local cache to reduce redundant requests
-
----
-
-## 安装 / Installation
-
-### 方式一：从 GitHub 安装 / Install from GitHub (Recommended)
-
-复制以下链接，在 Seanime → Extensions → 右上角 + → **Install from URL** 粘贴 / Copy the manifest URL and paste in Seanime → Extensions → Install from URL:
+### 方式一：从 GitHub 安装
 
 ```
 https://raw.githubusercontent.com/Elisoar111/seanime-extensions/main/Bangumi/manifest.json
 ```
 
-### 方式二：手动安装 / Manual Install
+在 Seanime → Extensions → 右上角 + → **Install from URL** 粘贴。
 
-下载 [`bangumi-ui.json`](bangumi-ui.json) → 放入 `Seanime/extensions/` 目录 → 打开 Seanime → Extensions → 点 **重载** (Reload)。
+### 方式二：手动安装
 
----
-
-## 使用 / Usage
-
-1. 打开任意番剧条目页，插件自动匹配 Bangumi 条目 / Open any anime entry page; the plugin auto-matches the Bangumi subject
-2. 点击左侧栏 **Bangumi** 图标进入详情页 / Click the **Bangumi** sidebar icon to view details
-3. 顶部按钮：刷新、复制链接、在 Bangumi 打开、手动匹配、清除缓存 / Top bar: Refresh, Copy Link, Open in Bangumi, Manual Match, Clear Cache
+下载 `bangumi.plugin.js` + `manifest.json` 放入 Seanime `extensions/` 目录后重载。
 
 ---
 
-## 配置 / Configuration
+## 配置
 
-在 Seanime → Extensions → bangumi-ui 设置 / Configure in Seanime → Extensions → bangumi-ui:
-
-| 设置项 / Setting | 说明 / Description |
-|--------|------|
-| **Access Token** | Bangumi 个人令牌（可选）。创建地址：`https://next.bgm.tv/demo/access-token`（需在新站登录）。用于查看/管理我的收藏状态 / Personal access token (optional). Create at `https://next.bgm.tv/demo/access-token`. Required for collection management |
-| **API 端点 / Endpoints** | 默认官方 API `https://api.bgm.tv`，国内用户可添加镜像 / Default is the official API. Users in China can add mirror: `https://api.bangumi.lol` (comma-separated). Mirror is auto-appended when using defaults |
-| **自动匹配 / Auto Match** | 关闭后需手动搜索/搜索 ID 绑定 / Disable to search or bind by ID manually |
-| **加载角色/章节/关联 / Characters / Episodes / Relations** | 开关对应数据板块，关闭可减少请求 / Toggle sections on/off to reduce requests |
-
-### 配置示例 / Examples
-
-```
-# 仅官方 / Official only
-https://api.bgm.tv
-
-# 官方 + 镜像 / Official + mirror (same as default)
-https://api.bgm.tv,https://api.bangumi.lol
-
-# 仅镜像 / Mirror only
-https://api.bangumi.lol
-```
+| 设置 | 说明 |
+|------|------|
+| **Access Token** | 可选，用于管理收藏。创建：`https://next.bgm.tv/demo/access-token` |
+| **API 端点** | 默认 `https://api.bgm.tv`，国内可加镜像 `https://api.bangumi.lol` |
+| **自动匹配** | 关闭后需手动搜索/ID 绑定 |
+| **加载角色/章节/关联** | 开关对应数据板块 |
 
 ---
 
-## 常见问题 / FAQ
+## 常见问题
 
-**搜索失败/无法连接？ / Search fails / Can't connect?**  
-检查 API 端点设置。如果官方 API 被屏蔽，请添加镜像 `https://api.bangumi.lol` / Check the endpoint configuration. If the official API is blocked, add the mirror.
+**无法连接？** — 添加镜像端点 `https://api.bangumi.lol`
 
-**Token 无效（401）？ / Token invalid (401)?**  
-Access Token 有有效期，过期后需到 `https://next.bgm.tv/demo/access-token` 重新创建 / Access tokens expire. Recreate one at the token management page.
+**Token 无效（401）？** — 到 `https://next.bgm.tv/demo/access-token` 重新创建
 
-**手动匹配后提示"已绑定"但页面没变化？ / Bound but page didn't update?**  
-点「刷新」按钮 / Click the **Refresh** button.
+**绑定后没更新？** — 点「刷新」按钮
 
 ---
-
-## 开发 / Development
-
-```bash
-cd Bangumi
-npm install
-node build.js
-```
-
-编译产物 / Build output: `bangumi.plugin.js` (payload), `bangumi-ui.json` (manifest).
